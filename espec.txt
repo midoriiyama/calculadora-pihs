@@ -1,0 +1,61 @@
+Calculadora ---------------------
+
+Recebe o primeiro operando;
+Recebe o operador:
+▪ + : Soma;
+▪ - : Subtração;
+▪ * : Multiplicação;
+▪ / : Divisão;
+    Obs: Quando o divisor for igual a zero, deve-se informar que não é
+    possível realizar a operação;
+▪ ^ : Exponenciação;
+▪ c : Quantidade de combinações simples;
+    - Operando precisa ser INT não negativo. Informar impossibilidade;
+    - O valor do primeiro operando (n) precisa ser >= que o valor do segundo operando (r). Informar impossibilidade.
+
+▪ a : Quantidade de arranjos simples;
+    - Operando precisa ser INT não negativo, avisar a impossibilidade.
+    - O valor do primeiro operando (n) precisa ser >= que o valor do segundo operando (r). Informar impossibilidade.
+▪ l: Logaritmo do primeiro operando na base do segundo operando;
+    - Logaritmando deve ser maior que 0 e a base um número diferente de 1.
+
+▪ ! : Fatorial;
+    Obs: Operando precisa ser INT não negativo, avisar a impossibilidade.
+▪ i : Inverso do número; (1÷numero)
+    - Informar que não é possível realizar a operação para 0.
+▪ r : Raiz quadrada;
+    - Informar que não é possível realizar a operação para valor negativo.
+▪ p: Próximo primo maior ou igual ao número;
+Caso precisar, recebe o segundo operando.
+
+O resultado da operação deverá então ser exibido;
+Solicitar ao usuário se deseja continuar utilizando a calculadora;
+Caso positivo, uma nova operação deve ser realizada.
+
+
+Infos ----------------------------
+
+Organizar em funções. Em principal onde é a entrada e quebrar em várias funções.
+Para verificar se é INT ou não:
+• CVTTSD2SI;
+• CVTTSS2SI;
+• CVTTSI2SD;
+• CVTTSI2SS;
+• FILD;
+• FIST; e
+• FISTTP.
+
+Usar diretiva function;
+Implementar em pelo menos dois arquivos, um deles que chama lib.s função para entrada de dados, saída de dados (biblioteca).
+O segundo arquivo contém a main.
+
+Testar antes se a entrada está correspondente.
+Quando chamar a função de operação, os valores dos dados já são válidos
+Para isso criar uma função verificação que podem ser utilizados em vários pontos.
+
+Fazer função que cria e desfaz o registro de ativação.
+A função chamadora e a função chamada deve registrar e limpar os registradores para não sujar o programa.
+
+Devem ser utilizados os cinco registradores convencionais para passar os parâmetros, não utilizaremos a pilha.
+
+Nunca usar saltos para fora da função. Para sair da função, usar RET.
