@@ -59,3 +59,5 @@ A função chamadora e a função chamada deve registrar e limpar os registrador
 Devem ser utilizados os cinco registradores convencionais para passar os parâmetros, não utilizaremos a pilha.
 
 Nunca usar saltos para fora da função. Para sair da função, usar RET.
+
+Verificações do 0 (uma função) fazer/chamar? na main antes de chamar a função de divisão por exemplo.
