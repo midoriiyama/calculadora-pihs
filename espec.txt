@@ -8,7 +8,7 @@ Recebe o operador:
 ▪ / : Divisão;
     Obs: Quando o divisor for igual a zero, deve-se informar que não é
     possível realizar a operação;
-▪ ^ : Exponenciação;
+▪ ^ : Exponenciação; (verificar se pode ser expoente negativo)
 ▪ c : Quantidade de combinações simples;
     - Operando precisa ser INT não negativo. Informar impossibilidade;
     - O valor do primeiro operando (n) precisa ser >= que o valor do segundo operando (r). Informar impossibilidade.

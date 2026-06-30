@@ -1,5 +1,5 @@
 .section .text
-.global verifica_divisao, verifica_ac, verifica_logaritmo, verifica_fatorial, verifica_inverso, verifica_raiz
+.global verifica_divisao, verifica_ac, verifica_logaritmo, verifica_fatorial, verifica_inverso, verifica_raiz, erro_operador
 .global ler_numero, ler_operador, mostrar_resultado, mostrar_resultado_float
 .global soma, subtracao, multiplicacao, divisao, exponenciacao, combinacao, arranjo, logaritmo, fatorial, inverso, raiz, primo
 
@@ -11,6 +11,8 @@
     msg_resultado: .asciz "O resultado é: %lld\n"
     msg_in_numero: .asciz "Digite o numero: "
     msg_resultado_float: .asciz "O resultado é: %lf\n"
+    msg_operando_invalido: .asciz "O operando é inválido.\n"
+    msg_operador_invalido: .asciz "O operador é inválido.\n"
 
     # Mensagens de erro
     msg_erro_zero: .asciz "Erro: Não é possível realizar a operação para 0.\n"
@@ -32,6 +34,9 @@
 
 .section .text
 
+
+#  --- LER E VERIFICA ENTRADA OPERANDO ---
+
 ler_numero:
     push %rbp
     mov %rsp, %rbp
@@ -48,8 +53,48 @@ ler_numero:
     lea buffer_temp(%rip), %rsi
     call scanf
 
-    movsd buffer_temp(%rip), %xmm0
+    cmp $1, %rax
+    jne erro_ler_numero
 
+    movsd buffer_temp(%rip), %xmm0
+    jmp finalizar_ler_numero
+
+erro_ler_numero:
+    lea msg_operando_invalido(%rip), %rdi
+    
+    call printf
+    
+    call limpar_buffer
+    
+    xor %rax, %rax
+    jmp finalizar_ler_numero
+
+finalizar_ler_numero:
+    mov %rbp, %rsp
+    pop %rbp
+    ret
+
+
+limpar_buffer:
+    push %rbp
+    mov %rsp, %rbp
+    
+    and $-16, %rsp      
+
+loop_limpar:
+
+    xor %rax, %rax
+    call getchar # le o char q ta no buffer esperando ser armazenado e descarta
+
+    cmp $10, %eax # ASCII(10) = ('\n' / Enter)
+    je fim_limpar
+
+    cmp $-1, %eax # ASCII(-1) = EOF    
+    je fim_limpar
+
+    jmp loop_limpar     
+
+fim_limpar:
     mov %rbp, %rsp
     pop %rbp
     ret
@@ -73,6 +118,19 @@ ler_operador:
     pop %rbp
     ret
 
+erro_operador:
+    push %rbp
+    mov %rsp, %rbp
+    
+    xor %rax, %rax
+    lea msg_operador_invalido(%rip), %rdi
+    call printf
+
+    mov %rbp, %rsp
+    pop %rbp
+    ret
+
+
 mostrar_resultado_float:
     push %rbp
     mov %rsp, %rbp
@@ -95,6 +153,8 @@ mostrar_resultado:
     push %rbp
     mov %rsp, %rbp
 
+    and $-16, %rsp
+
     xor %rax, %rax
     lea msg_resultado(%rip), %rdi
     movq resultado(%rip), %rsi
@@ -108,9 +168,8 @@ soma:
     push %rbp
     mov %rsp, %rbp
 
-    xor %rax, %rax
-    movq %rdi, %rax
-    addq %rsi, %rax
+    # xmm0 = operando1, xmm1 = operando2 (double)
+    addsd %xmm1, %xmm0
 
     mov %rbp, %rsp
     pop %rbp
@@ -120,10 +179,8 @@ subtracao:
     push %rbp
     mov %rsp, %rbp
 
-    xor %rax, %rax
-
-    movq %rdi, %rax
-    addq %rsi, %rax
+    # xmm0 = operando1, xmm1 = operando2 (double)
+    subsd %xmm1, %xmm0
 
     mov %rbp, %rsp
     pop %rbp
@@ -133,10 +190,9 @@ multiplicacao:
     push %rbp
     mov %rsp, %rbp
 
-    xor %rax, %rax
-    movq %rdi, %rax
-    mulq %rsi
-    
+    # xmm0 = operando1, xmm1 = operando2 (double)
+    mulsd %xmm1, %xmm0
+
     mov %rbp, %rsp
     pop %rbp
     ret
@@ -144,10 +200,12 @@ multiplicacao:
 verifica_divisao:
     push %rbp
     mov %rsp, %rbp
-    
-    cmp $0, %rsi
+
+    # xmm1 = operando2 (divisor), double
+    pxor %xmm2, %xmm2
+    comisd %xmm2, %xmm1
     je nao_pode_dividir
-    
+
     jmp pode_dividir
     
 nao_pode_dividir:
@@ -168,17 +226,8 @@ divisao:
     push %rbp
     mov %rsp, %rbp
 
-    push %rsi # topo da pilha = rsi
-    fildq (%rsp) # st(0) = topo da pilha rsp
-
-    push %rdi             
-    fildq (%rsp) # st(0) = rdi
-
-    fdiv %st(1), %st(0) # st(0) = st(0) / st(1)
-
-    fstpl (%rsp) # rsp = st(0)
-
-    movsd (%rsp), %xmm0 
+    # xmm0 = operando1 (dividendo), xmm1 = operando2 (divisor)
+    divsd %xmm1, %xmm0
 
     mov %rbp, %rsp
     pop %rbp
@@ -188,16 +237,20 @@ exponenciacao:
     push %rbp
     mov %rsp, %rbp
 
-    # rdi e rsi
+    # xmm0 = base (double), rdi = expoente (inteiro truncado)
+    movsd %xmm0, %xmm1          # xmm1 = base
+    movq %rdi, %rcx             # rcx = expoente
+
+    # resultado inicial = 1.0
+    pxor %xmm0, %xmm0
     movq $1, %rax
-    movq %rdi, %rbx
-    movq %rsi, %rcx
+    cvtsi2sd %rax, %xmm0
 
 loop_exponenciacao:
     cmp $0, %rcx
     jle fim_exponenciacao
-    
-    mulq %rbx
+
+    mulsd %xmm1, %xmm0
     decq %rcx
     jmp loop_exponenciacao
 
@@ -324,11 +377,15 @@ verifica_logaritmo:
     push %rbp
     mov %rsp, %rbp
 
-    cmpq $0, %rdi
-    jle nao_pode_logaritmo1
-    
-    cmpq $1, %rsi
-    je nao_pode_logaritmo2
+    # xmm0 = logaritmando, xmm1 = base (double)
+    pxor %xmm2, %xmm2
+    comisd %xmm0, %xmm2
+    jae nao_pode_logaritmo1     # logaritmando <= 0
+
+    movq $1, %rax
+    cvtsi2sd %rax, %xmm2
+    comisd %xmm2, %xmm1
+    je nao_pode_logaritmo2      # base == 1
 
     movq $1, %rax
     jmp fim_verifica_logaritmo
@@ -355,27 +412,30 @@ fim_verifica_logaritmo:
 logaritmo:
     push %rbp
     mov %rsp, %rbp
-    
+
+    # xmm0 = x (logaritmando), xmm1 = b (base), ambos double
+    sub $16, %rsp
+    movsd %xmm0, (%rsp)         # guarda x na pilha
+    movsd %xmm1, 8(%rsp)        # guarda b na pilha
+
     # --- CALCULAR O log2(x) ---
     fld1
-    push %rdi
-    fildq (%rsp) # st(0) = x
+    fldl (%rsp) # st(0) = x
     fyl2x # st(0) = log2(x)
 
     # --- CALCULAR O log2(base) ---
     fld1                   
-    push %rsi
-    fildq (%rsp) # st(0) = b e st(1) = log2(x)
+    fldl 8(%rsp) # st(0) = b e st(1) = log2(x)
     fyl2x # st(0) = log2(b) e st(1) = log2(x)
 
     # --- MUDANCA DE BASE ---
     fxch # Troca: st(0) = log2(x) e st(1) = log2(b)
     fdiv %st(1), %st(0) # st(0) = log2(x) / log2(b)
 
-
     fstpl (%rsp)
-    movsd (%rsp), %xmm0     
+    movsd (%rsp), %xmm0
 
+    add $16, %rsp
     mov %rbp, %rsp
     pop %rbp
     ret
@@ -426,7 +486,9 @@ verifica_inverso:
     push %rbp
     mov %rsp, %rbp
 
-    cmpq $0, %rdi
+    # xmm0 = operando (double)
+    pxor %xmm1, %xmm1
+    comisd %xmm1, %xmm0
     je nao_pode_inverso
 
     movq $1, %rax
@@ -446,15 +508,12 @@ fim_verifica_inverso:
 inverso:
     push %rbp
     mov %rsp, %rbp
-    
-    push %rdi
-    fildq (%rsp) # st(0) = operando1
 
-    fld1 # Empilha +1.0
-    fdiv %st(1), %st(0)  # st(0) = (1.0 / operando)
-
-    fstpl (%rsp)            
-    movsd (%rsp), %xmm0
+    # xmm0 = operando (double); calcular 1.0 / operando
+    movsd %xmm0, %xmm1          # xmm1 = operando
+    movq $1, %rax
+    cvtsi2sd %rax, %xmm0        # xmm0 = 1.0
+    divsd %xmm1, %xmm0          # xmm0 = 1.0 / operando
 
     mov %rbp, %rsp
     pop %rbp
@@ -464,8 +523,10 @@ verifica_raiz:
     push %rbp
     mov %rsp, %rbp
 
-    cmpq $0, %rdi
-    jl nao_pode_raiz
+    # xmm0 = operando (double)
+    pxor %xmm1, %xmm1
+    comisd %xmm1, %xmm0
+    jb nao_pode_raiz
 
     movq $1, %rax
     jmp fim_verifica_raiz
@@ -484,15 +545,10 @@ fim_verifica_raiz:
 raiz:
     push %rbp
     mov %rsp, %rbp
-    
-    movq %rdi, buffer_temp(%rip)
-    fildq buffer_temp(%rip)
 
-    fsqrt
+    # xmm0 = operando (double)
+    sqrtsd %xmm0, %xmm0
 
-    fstpl buffer_temp(%rip)               
-    movsd buffer_temp(%rip), %xmm0
-    
     mov %rbp, %rsp
     pop %rbp
     ret
