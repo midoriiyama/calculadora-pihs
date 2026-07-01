@@ -34,6 +34,7 @@
     fmt_op: .asciz " %c"
     fmt_out_int: .asciz "%lld\n"
     fmt_double: .asciz "%lf"
+    fmt_double_n: .asciz "%lf%n"
     fmt_string: .asciz "%s"
 
 
@@ -68,40 +69,38 @@ ler_numero:
     push %rbp
     mov %rsp, %rbp
     and $-16, %rsp
-    
-    # Reservamos 32 bytes na pilha: 8 pro double, e 4 para guardar a contagem do %n
-    sub $32, %rsp      
+    sub $32, %rsp                  # Espaço seguro na pilha
 
     # Argumentos do sscanf:
-    mov %r12, %rdi               # 1º Arg: Lê do %r12
-    lea fmt_double_n(%rip), %rsi # 2º Arg: Formato "%lf%n"
-    lea 16(%rsp), %rdx           # 3º Arg: Onde salvar o double
-    lea 24(%rsp), %rcx           # 4º Arg: Onde salvar a contagem do %n
+    mov %r12, %rdi                 # 1º Arg: De onde ler? (o nosso ponteiro %r12)
+    lea fmt_double_n(%rip), %rsi   # 2º Arg: Formato
+    lea 16(%rsp), %rdx             # 3º Arg: Onde salvar o double
+    lea 24(%rsp), %rcx             # 4º Arg: Onde salvar a contagem do %n
 
-    xor %rax, %rax
-    call sscanf                  # Chama a biblioteca C
+    xor %rax, %rax                 # Zerar %rax é OBRIGATÓRIO para a libc
+    call sscanf                    # ATENÇÃO: Tem que ser sscanf (com dois "S")!
 
-    cmp $1, %rax                 # Verifica se leu o número com sucesso
+    # Verifica se encontrou um número
+    cmp $1, %rax
     jl .erro_leitura
 
-    movsd 16(%rsp), %xmm0        # Recupera o número convertido
+    movsd 16(%rsp), %xmm0          # Coloca o double lido no xmm0
+    
+    # A MÁGICA: Pula o %r12 passado o número!
+    movslq 24(%rsp), %rax          # Pega quantos caracteres o número usou
+    addq %rax, %r12                # Empurra o %r12 para frente!
 
-    # ========================================================
-    # A MÁGICA: Avança o %r12 passado o número!
-    # ========================================================
-    movslq 24(%rsp), %rax        # Pega a contagem de caracteres lidos
-    addq %rax, %r12              # Avança o %r12. Agora ele aponta certinho pro '+' !
-
-    mov $1, %rax
+    mov $1, %rax                   # Sucesso
     jmp .fim_ler_numero
 
 .erro_leitura:
-    mov $0, %rax
+    call limpar_buffer
+    xor %rax, %rax
+                
 .fim_ler_numero:
     mov %rbp, %rsp
     pop %rbp
     ret
-
 
 ler_operador:
     push %rbp

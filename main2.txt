@@ -34,73 +34,41 @@ main:
     # %r12 vai ser o nosso "dedo" apontando e percorrendo o texto
     lea buffer_linha(%rip), %r12    
 
+    # ==============================================================
+    # LENDO A EXPRESSÃO DA MEMÓRIA
+    # ==============================================================
 .ler_primeiro_operando:
-    movzbl (%r12), %eax            # Olha para o 1º caractere (ex: 'a' ou '5')
+    movzbl (%r12), %eax            # Lê o 1º caractere
     cmpb $'a', %al
-    jl .primeiro_e_numero          # Se for menor que 'a', não é variável (é número)
+    jl .primeiro_e_numero
     cmpb $'z', %al
-    jg .primeiro_e_numero          # Se for maior que 'z', não é variável
+    jg .primeiro_e_numero
 
-    # --- CASO 1: É UMA VARIÁVEL (Ex: "a+5") ---
-    subb $97, %al                  # Acha o índice (a=0, b=1...)
+    # --- É VARIÁVEL (Ex: "a") ---
+    subb $97, %al
     movzbq %al, %rax
-    shlq $3, %rax                  # Multiplica por 8 (tamanho double)
-    
+    shlq $3, %rax                  # Multiplica índice por 8
+
     lea lista_var(%rip), %rdi
-    addq %rax, %rdi                # %rdi aponta para a gaveta certa
-    movsd (%rdi), %xmm0            # Puxa o double da gaveta direto pra xmm0!
-    
-    movsd %xmm0, operando1(%rip)   # Salva em operando1
-    
-    inc %r12                       # MÁGICA: Avança o "dedo" 1 byte pra pular a letra
-    jmp .ler_o_operador            # Vai direto ler o operador (+, -, etc)
+    addq %rax, %rdi                # Acha a gaveta da variável
+    movsd (%rdi), %xmm0
+
+    movsd %xmm0, operando1(%rip)   # Salva o valor em operando1
+
+    inc %r12                       # PULA a letra!
+    jmp .ler_o_operador
 
 .primeiro_e_numero:
-    # --- CASO 2: É UM NÚMERO NORMAL (Ex: "5+a") ---
     xor %rax, %rax
-    call ler_numero                # Aqui chamamos a sua função normal!
-
-    cmp $0, %rax
-    je .verifica_loop
+    call ler_numero                # Chama a nova função com sscanf
     movsd %xmm0, operando1(%rip)
 
 .ler_o_operador:
-    # Em vez de chamar ler_operador e sscanf, pegamos o caractere direto de %r12!
-    movzbl (%r12), %eax            # Lê o byte atual (que é o operador, ex: '+')
-    movb %al, operador(%rip)       # Salva na sua variável global "operador"
-    
-    inc %r12                       # Avança o "dedo" mais 1 byte, pulando o operador!
+    movzbl (%r12), %eax            # Lê o Operador (+, -, *, !)
+    movb %al, operador(%rip)
+    inc %r12                       # CRUCIAL: Pula o operador!
 
-    # Restaura o operando1 no xmm0 e vai para as suas verificações
-    movsd operando1(%rip), %xmm0
-    jmp .verifica_operador1
-
-.ler_segundo_operando:
-    movzbl (%r12), %eax            # Lê o primeiro caractere após o operador (ex: '2' de 23 ou 'a')
-    cmpb $'a', %al
-    jl .segundo_e_numero           # Se menor que 'a', é número
-    cmpb $'z', %al
-    jg .segundo_e_numero           # Se maior que 'z', é número
-
-    # --- É UMA VARIÁVEL (Ex: 5+a) ---
-    subb $97, %al                  
-    movzbq %al, %rax
-    shlq $3, %rax                  
-    lea lista_var(%rip), %rdi
-    addq %rax, %rdi                
-    movsd (%rdi), %xmm0            # Puxa o valor da variável da memória
-    movsd %xmm0, operando2(%rip)   
-    
-    jmp .verifica_operador2             # Já temos o valor, vai pra conta!
-
-.segundo_e_numero:
-    # --- É UM NÚMERO NORMAL (Ex: 5+23) ---
-    xor %rax, %rax
-    call ler_numero                # Chama nosso novo ler_numero otimizado!
-    movsd %xmm0, operando2(%rip)
-    jmp .verifica_operador2
-    
-.verifica_operador1:
+    # Se for fatorial (!), não existe 2º operando, pula direto pra conta!
     cmpb $'!', %al
     je .chamar_fatorial
 
@@ -113,9 +81,32 @@ main:
     cmpb $'i', %al
     je .chamar_inverso
 
-    jmp .verifica_operador2
+.ler_segundo_operando:
+    movzbl (%r12), %eax            # Lê o 1º caractere após o operador
+    cmpb $'a', %al
+    jl .segundo_e_numero
+    cmpb $'z', %al
+    jg .segundo_e_numero
 
-    .verifica_operador2:
+    # --- É VARIÁVEL (Ex: "a") ---
+    subb $97, %al
+    movzbq %al, %rax
+    shlq $3, %rax
+    lea lista_var(%rip), %rdi
+    addq %rax, %rdi
+    movsd (%rdi), %xmm0
+    movsd %xmm0, operando2(%rip)   # Salva o valor em operando2
+    jmp .fazer_a_conta             # Tudo lido, vai pra matemática!
+
+.segundo_e_numero:
+    xor %rax, %rax
+    call ler_numero
+    movsd %xmm0, operando2(%rip)
+
+.fazer_a_conta:
+    # ==============================================================
+    # AQUI VOCÊ VERIFICA O SINAL E CHAMA A MATEMÁTICA
+    # ==============================================================
     cmpb $'+', %al
     je .chamar_soma
 
@@ -142,6 +133,7 @@ main:
     
     call erro_operador
     jmp .verifica_loop
+
 
     .foi_salvo_como_funcao:
     xor %rax, %rax
