@@ -57,7 +57,6 @@ ler_buffer:
     xor %rax, %rax
     lea fmt_string(%rip), %rdi
     lea buffer_linha(%rip), %rsi
-    xor %rax, %rax
     call scanf
     
     mov %rbp, %rsp
@@ -70,18 +69,39 @@ ler_numero:
     mov %rsp, %rbp
     and $-16, %rsp
 
-    lea fmt_double(%rip), %rdi
+    # Pega ponteiro para posição atual do buffer
     lea buffer_linha(%rip), %rsi
-    xor %rax, %rax
-    call scanf
+    movzbl (%rsi), %eax
+
+    # Caso 1: é letra isolada → variável
+    # verificar: é letra E o próximo char é espaço/operador/nulo
+    cmpb $'a', %al
+    jl .tentar_numero
+    cmpb $'z', %al
+    jg .tentar_numero
+    call buscar_variavel
+    jmp fim_ler_numero
+
+    # Caso 2: é "f(" → chamada de função
+    .tentar_funcao:
+    movzbl 1(%rsi), %ebx
+    cmpb $'(', %bl
+    jne .tentar_numero
+    call avaliar_expressao_funcao
+    jmp fim_ler_numero
+
+    # Caso 3: número literal → sscanf como antes
+    .tentar_numero:
+    lea fmt_double(%rip), %rdi
+    call sscanf
 
     cmp $1, %rax
-    jne erro_ler_numero
+    jne .erro_ler_numero
 
     movsd (%rsp), %xmm0
-    jmp finalizar_ler_numero
+    jmp .finalizar_ler_numero
 
-erro_ler_numero:
+    .erro_ler_numero:
     call limpar_buffer  
 
     lea msg_operando_invalido(%rip), %rdi
@@ -90,7 +110,7 @@ erro_ler_numero:
 
     xor %rax, %rax        
 
-finalizar_ler_numero:
+    .fim_ler_numero:
     mov %rbp, %rsp
     pop %rbp
     ret
@@ -133,23 +153,22 @@ limpar_buffer:
     
     and $-16, %rsp  
 
-loop_limpar_buffer:
+    .loop_limpar_buffer:
     xor %rax, %rax
     call getchar # le o char q ta no buffer esperando ser armazenado e descarta
 
     cmp $10, %eax # ASCII(10) = ('\n' / Enter)
-    je fim_limpar_buffer
+    je .fim_limpar_buffer
 
     cmp $-1, %eax # ASCII(-1) = EOF    
-    je fim_limpar_buffer
+    je .fim_limpar_buffer
 
-    jmp loop_limpar_buffer 
+    jmp .loop_limpar_buffer 
 
-fim_limpar_buffer:
+    .fim_limpar_buffer:
     mov %rbp, %rsp
     pop %rbp
     ret
-
 
 mostrar_resultado:
     push %rbp
@@ -191,7 +210,7 @@ continuar:
     and $-16, %rsp
     sub $16, %rsp
 
-loop_continuar:
+    .loop_continuar:
     xor %rax, %rax
     lea msg_continuar(%rip), %rdi
     call printf
@@ -204,25 +223,25 @@ loop_continuar:
     movq (%rsp), %rbx
 
     cmpb $'n', %bl
-    je retorna_zero
+    je .retorna_zero
 
     cmpb $'s', %bl
-    jne erro_continua
+    jne .erro_continua
 
     movq $1, %rax
-    jmp finaliza_continuar
+    jmp .finaliza_continuar
 
-retorna_zero:
+    .retorna_zero:
     xor %rax, %rax
-    jmp finaliza_continuar
+    jmp .finaliza_continuar
 
-erro_continua:
+    .erro_continua:
     xor %rax, %rax
     lea msg_erro_continuar(%rip), %rdi
     call printf
-    jmp loop_continuar
+    jmp .loop_continuar
 
-finaliza_continuar:
+    .finaliza_continuar:
     mov %rbp, %rsp
     pop %rbp
     ret
@@ -289,15 +308,15 @@ exponenciacao:
     movq $1, %rax
     cvtsi2sd %rax, %xmm0
 
-loop_exponenciacao:
+    .loop_exponenciacao:
     cmp $0, %rcx
-    jle fim_exponenciacao
+    jle .fim_exponenciacao
 
     mulsd %xmm1, %xmm0
     decq %rcx
-    jmp loop_exponenciacao
+    jmp .loop_exponenciacao
     
-fim_exponenciacao:
+    .fim_exponenciacao:
     mov %rbp, %rsp
     pop %rbp
     ret
@@ -419,24 +438,24 @@ fatorial:
     mov %rsp, %rbp
     
     cmpq $0, %rdi
-    je caso_zero_fatorial
+    je .caso_zero_fatorial
     
     xor %rax, %rax
     movq %rdi, %rax
     movq %rax, %rcx
 
-loop_fatorial:
+    .loop_fatorial:
     decq %rcx
     cmpq $1, %rcx
-    jle fim_fatorial
+    jle .fim_fatorial
     
     mulq %rcx
-    jmp loop_fatorial
+    jmp .loop_fatorial
 
-caso_zero_fatorial:
+    .caso_zero_fatorial:
     movq $1, %rax
 
-fim_fatorial:
+    .fim_fatorial:
     mov %rbp, %rsp
     pop %rbp
     ret
@@ -474,10 +493,10 @@ primo:
     mov %rsp, %rbp
 
     cmp $2, %rdi
-    jge iniciar_primo
+    jge .iniciar_primo
     movq $2, %rdi
 
-iniciar_primo:
+    .iniciar_primo:
     movq %rdi, %rax
     xor %rdx, %rdx
     
@@ -487,11 +506,11 @@ iniciar_primo:
     movq %rax, %rcx
 
     
-loop_primo:
+    .loop_primo:
     movq %rdi, %rax
 
     cmp $1, %rcx
-    jle fim_primo
+    jle .fim_primo
 
     xor %rdx, %rdx
     divq %rcx
@@ -499,11 +518,11 @@ loop_primo:
     decq %rcx
     
     cmp $0, %rdx
-    je proximo_numero
+    je .proximo_numero
     
-    jmp loop_primo
+    jmp .loop_primo
 
-proximo_numero:
+    .proximo_numero:
     incq %rdi
 
     movq %rdi, %rax
@@ -515,14 +534,14 @@ proximo_numero:
 
     jmp loop_primo
 
-fim_primo:
+    .fim_primo:
     movq %rdi, %rax
     
     mov %rbp, %rsp
     pop %rbp
     ret
 
-verifica_zero: # serve para divisao, e inverso (lembrar de trocar para o xmm1)
+verifica_zero:
     push %rbp
     mov %rsp, %rbp
     and $-16, %rsp
@@ -530,20 +549,22 @@ verifica_zero: # serve para divisao, e inverso (lembrar de trocar para o xmm1)
     xor %rax, %rax
     cvtsi2sd %rax, %xmm2
     comisd %xmm2, %xmm1
-    je eh_zero
+    je .eh_zero
     movq $1, %rax 
-
-finaliza:
-    mov %rbp, %rsp
-    pop %rbp
-    ret
-
-eh_zero:
+    jmp .finaliza
+    
+    .eh_zero:
     xor %rax, %rax
     lea msg_erro_zero(%rip), %rdi
     call printf
     xor %rax, %rax
-    jmp finaliza
+    jmp .finaliza
+
+    .finaliza:
+    mov %rbp, %rsp
+    pop %rbp
+    ret
+
 
 
 verifica_int_nao_negativo:
@@ -554,22 +575,22 @@ verifica_int_nao_negativo:
     cvttsd2si %xmm0, %rax
     cvtsi2sd %rax, %xmm1
     comisd %xmm0, %xmm1
-    jne nao_e_inteiro_nao_negativo
+    jne .nao_e_inteiro_nao_negativo
 
     pxor %xmm1, %xmm1
     comisd %xmm1, %xmm0        # xmm0 CMP xmm1(=0): testa se xmm0 >= 0
-    jb nao_e_inteiro_nao_negativo   # se xmm0 < 0 → erro
+    jb .nao_e_inteiro_nao_negativo   # se xmm0 < 0 → erro
 
     movq $1, %rax              # ← sucesso
-    jmp fim_verifica_int_nao_negativo
+    jmp .fim_verifica_int_nao_negativo
 
-nao_e_inteiro_nao_negativo:
+    .nao_e_inteiro_nao_negativo:
     xor %rax, %rax
     lea msg_erro_int(%rip), %rdi
     call printf
     xor %rax, %rax
 
-fim_verifica_int_nao_negativo:
+    .fim_verifica_int_nao_negativo:
     mov %rbp, %rsp
     pop %rbp
     ret
@@ -581,18 +602,18 @@ verifica_menor_ac:
     and $-16, %rsp
 
     cmpq %rsi, %rdi # compara n e p
-    jl nao_pode_menor_ac
+    jl .nao_pode_menor_ac
 
     movq $1, %rax
-    jmp fim_verifica_menor_ac
+    jmp .fim_verifica_menor_ac
 
-nao_pode_menor_ac:
+    .nao_pode_menor_ac:
     xor %rax, %rax
     lea msg_erro_ac(%rip), %rdi
     call printf
     xor %rax, %rax
 
-fim_verifica_menor_ac:
+    .fim_verifica_menor_ac:
     mov %rbp, %rsp
     pop %rbp
     ret
@@ -605,20 +626,20 @@ verifica_ac:
     # verifica se n (xmm0) é inteiro não negativo
     call verifica_int_nao_negativo
     cmp $0, %rax
-    je fim_verifica_ac
+    je .fim_verifica_ac
 
     # verifica se p (xmm1) é inteiro não negativo
     movsd %xmm1, %xmm0
     call verifica_int_nao_negativo
     cmp $0, %rax
-    je fim_verifica_ac
+    je .fim_verifica_ac
 
     # verifica se n >= p
     cvttsd2si operando1(%rip), %rdi
     cvttsd2si operando2(%rip), %rsi
     call verifica_menor_ac
 
-fim_verifica_ac:
+    .fim_verifica_ac:
     mov %rbp, %rsp
     pop %rbp
     ret
@@ -631,31 +652,31 @@ verifica_logaritmo:
     # xmm0 = logaritmando, xmm1 = base (double)
     pxor %xmm2, %xmm2
     comisd %xmm0, %xmm2
-    jae nao_pode_logaritmo1     # logaritmando <= 0
+    jae .nao_pode_logaritmo1     # logaritmando <= 0
 
     movq $1, %rax
     cvtsi2sd %rax, %xmm2
     comisd %xmm2, %xmm1
-    je nao_pode_logaritmo2      # base == 1
+    je .nao_pode_logaritmo2      # base == 1
 
     movq $1, %rax
-    jmp fim_verifica_logaritmo
+    jmp .fim_verifica_logaritmo
     
-nao_pode_logaritmo1:
+    .nao_pode_logaritmo1:
     xor %rax, %rax
     lea msg_erro_log1(%rip), %rdi
     call printf
     xor %rax, %rax
-    jmp fim_verifica_logaritmo
+    jmp .fim_verifica_logaritmo
 
-nao_pode_logaritmo2:
+    .nao_pode_logaritmo2:
     xor %rax, %rax
     lea msg_erro_log2(%rip), %rdi
     call printf
     xor %rax, %rax
-    jmp fim_verifica_logaritmo
+    jmp .fim_verifica_logaritmo
 
-fim_verifica_logaritmo:
+    .fim_verifica_logaritmo:
     mov %rbp, %rsp
     pop %rbp
     ret
@@ -668,18 +689,18 @@ verifica_raiz:
 
     pxor %xmm1, %xmm1
     comisd %xmm1, %xmm0     # xmm0 = operando
-    jb nao_pode_raiz
+    jb .nao_pode_raiz
 
     movq $1, %rax
-    jmp fim_verifica_raiz
+    jmp .fim_verifica_raiz
     
-nao_pode_raiz:
+    .nao_pode_raiz:
     xor %rax, %rax
     lea msg_erro_neg(%rip), %rdi
     call printf
     xor %rax, %rax
 
-fim_verifica_raiz:
+    .fim_verifica_raiz:
     mov %rbp, %rsp
     pop %rbp
     ret
@@ -688,7 +709,6 @@ fim_verifica_raiz:
 
 
 salvar_funcao:
-    # Prólogo oficial da função [4]
     push %rbp
     mov %rsp, %rbp
     and $-16, %rsp
@@ -697,20 +717,19 @@ salvar_funcao:
     lea buffer_linha(%rip), %r12
 
     # --- PASSO 1: VERIFICAR SE O FORMATO É f(x)= ---
-    # Compara o caractere na posição 1: deve ser '('
     movzbl 1(%r12), %eax
     cmpb $'(', %al
-    jne nao_e_funcao        # Se não for '(', salta (não é definição de função) [3]
+    jne .nao_e_funcao        # Se não for '(', salta (não é definição de função) [3]
 
     # Compara o caractere na posição 3: deve ser ')'
     movzbl 3(%r12), %eax
     cmpb $')', %al
-    jne nao_e_funcao
+    jne .nao_e_funcao
 
     # Compara o caractere na posição 4: deve ser '='
     movzbl 4(%r12), %eax
     cmpb $'=', %al
-    jne nao_e_funcao
+    jne .nao_e_funcao
 
     # --- PASSO 2: CALCULAR O ENDEREÇO DA GAVETA (OTIMIZADO) ---
     # Se chegou aqui, temos certeza que o usuário digitou f(x)=
@@ -719,7 +738,6 @@ salvar_funcao:
     
     movzbq %al, %rax        # Estende para 64 bits para fazer a conta
     
-    # MÁGICA DA OTIMIZAÇÃO: Deslocamento lógico para a esquerda [2, 5]
     # Deslocar 5 bits para a esquerda multiplica o valor por 32 (2^5) rapidamente!
     shlq $5, %rax           
 
@@ -735,33 +753,33 @@ salvar_funcao:
     lea 5(%r12), %rsi       # %rsi aponta para o caractere 5 do buffer (início do "7*9")
     lea 1(%rdi), %rdx       # %rdx aponta para o byte 1 da gaveta (logo após o 'x')
 
-copiar_expressao:
+    .copiar_expressao:
     movzbl (%rsi), %eax     # Lê 1 byte da expressão
     movb %al, (%rdx)        # Escreve na gaveta
 
     # Condições de parada
     cmpb $10, %al           # É o Enter (ASCII 10 - quebra de linha)?
-    je fim_copiar           # Salta para o fim se for o enter [3]
+    je .fim_copiar           # Salta para o fim se for o enter [3]
     cmpb $0, %al            # É o fim da string (NULL)?
-    je fim_copiar           
+    je .fim_copiar           
 
     inc %rsi                # Avança o ponteiro de leitura
     inc %rdx                # Avança o ponteiro de escrita
-    jmp copiar_expressao    # Repete o laço
+    jmp .copiar_expressao    # Repete o laço
 
-fim_copiar:
+    .fim_copiar:
     # Força o caractere NULL (\0) no final da string salva para segurança das chamadas futuras
     movb $0, (%rdx)         
     
     # Retorna 1 (Sucesso) no %rax, de acordo com a convenção de funções [6]
     mov $1, %rax
-    jmp sair_salvar_funcao
+    jmp .sair_salvar_funcao
 
-nao_e_funcao:
+    .nao_e_funcao:
     # Retorna 0 (Não era uma função)
     mov $0, %rax
 
-sair_salvar_funcao:
+    sair_salvar_funcao:
     # Epílogo: Restaura os ponteiros da pilha e encerra [4]
     mov %rbp, %rsp
     pop %rbp
@@ -780,7 +798,7 @@ salvar_variavel:
     # %eax tem o byte na posicao 1 de %r12 ('=')
     movzbl 1(%r12), %eax
     cmpb $'=', %al
-    jne nao_e_variavel
+    jne .nao_e_variavel
 
     # Calcula posição da variável
     # %eax vai receber o nome da variavel
@@ -815,13 +833,12 @@ salvar_variavel:
     call sscanf
 
     mov $1, %rax
-    jmp sair_salvar_variavel
-
-    
-nao_e_variavel:
+    jmp .sair_salvar_variavel
+ 
+    .nao_e_variavel:
     xor %rax, %rax
 
-sair_salvar_variavel:
+    .sair_salvar_variavel:
     mov %rbp, %rsp
     pop %rbp
     ret
