@@ -6,6 +6,7 @@
 .global verifica_ac, verifica_logaritmo, verifica_raiz
 .global salvar_funcao, ler_buffer, salvar_variavel
 .global msg_out_funcao, msg_out_variavel
+
 .section .data
     msg_in: .asciz "Digite a expressão:\n"
     
@@ -45,6 +46,10 @@
 .section .text
 
 ler_buffer:
+    push %rbp
+    mov %rsp, %rbp
+    and $-16, %rsp
+    
     xor %rax, %rax
     lea msg_in(%rip), %rdi
     call printf
@@ -54,6 +59,11 @@ ler_buffer:
     lea buffer_linha(%rip), %rsi
     xor %rax, %rax
     call scanf
+    
+    mov %rbp, %rsp
+    pop %rbp
+    ret
+
 
 ler_numero:
     push %rbp
@@ -84,6 +94,7 @@ finalizar_ler_numero:
     mov %rbp, %rsp
     pop %rbp
     ret
+
 
 ler_operador:
     push %rbp
@@ -680,6 +691,7 @@ salvar_funcao:
     # Prólogo oficial da função [4]
     push %rbp
     mov %rsp, %rbp
+    and $-16, %rsp
 
     # Carrega o endereço da linha digitada pelo usuário no registrador %r12
     lea buffer_linha(%rip), %r12
@@ -759,6 +771,7 @@ sair_salvar_funcao:
 salvar_variavel:
     push %rbp
     mov %rsp, %rbp
+    and $-16, %rsp
 
     # r12 tem o endereço do buffer_linha (contém o que o usuário digitou)
     lea buffer_linha(%rip), %r12
@@ -806,7 +819,6 @@ salvar_variavel:
 
 nao_e_variavel:
     xor %rax, %rax
-
 
 sair_salvar_variavel:
     mov %rbp, %rsp

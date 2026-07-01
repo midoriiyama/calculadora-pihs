@@ -9,6 +9,7 @@
     .comm buffer_linha, 256
 
 .section .text
+
 main:
     push %rbp
     mov %rsp, %rbp
