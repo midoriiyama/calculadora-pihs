@@ -6,6 +6,7 @@
     .comm operador, 8
     .comm operando2, 8
     .comm resultado, 8
+    .comm buffer_linha, 256
 
 .section .text
 main:
@@ -15,12 +16,19 @@ main:
 
 loop_principal:
 
-    xor %rax, %rax
-    lea msg_in(%rip), %rdi
-    call printf
+    call ler_buffer
+
+    call salvar_funcao
+    cmp $1, %rax
+    je foi_salvo_como_funcao
+
+    call salvar_variavel
+    cmp $1, %rax
+    je foi_salvo_como_variavel
 
     xor %rax, %rax
     call ler_numero
+
     cmp $0, %rax
     je verifica_loop
     movsd %xmm0, operando1(%rip)
@@ -84,6 +92,18 @@ verifica_operador2:
     
     call erro_operador
     jmp verifica_loop
+
+foi_salvo_como_funcao:
+    xor %rax, %rax
+    movq msg_out_funcao(%rip), %rdi
+    call printf
+    jmp loop_principal
+
+foi_salvo_como_variavel:
+    xor %rax, %rax
+    movq msg_out_variavel(%rip), %rdi
+    call printf
+    jmp loop_principal
 
 chamar_soma:
     call soma
