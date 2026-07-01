@@ -2,8 +2,8 @@
 DIR = executaveis
 OBJ_MAIN = $(DIR)/main.o
 OBJ_LIB = $(DIR)/lib.o
-ARQ1 = main1.s
-ARQ2 = lib1.s
+ARQ1 = main2.s
+ARQ2 = lib2.s
 EXEC = $(DIR)/calculadora
 # Alvo padrão: cria a pasta primeiro e depois compila tudo
 all: $(DIR) $(EXEC)

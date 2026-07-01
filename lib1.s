@@ -134,20 +134,6 @@ fim_limpar_buffer:
     ret
 
 
-verifica_erro_operador:
-    push %rbp
-    mov %rsp, %rbp
-    and $-16, %rsp
-
-    xor %rax, %rax
-    lea msg_operador_invalido(%rip), %rdi
-    call printf
-
-    mov %rbp, %rsp
-    pop %rbp
-    ret
-
-
 mostrar_resultado:
     push %rbp
     mov %rsp, %rbp

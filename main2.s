@@ -15,7 +15,11 @@ main:
 
 loop_principal:
 
-    lea msg_in_op1(%rip), %rdi
+    xor %rax, %rax
+    lea msg_in(%rip), %rdi
+    call printf
+
+    xor %rax, %rax
     call ler_numero
     cmp $0, %rax
     je verifica_loop
@@ -28,7 +32,6 @@ loop_principal:
 
 dois_operando:
 
-    lea msg_in_op2(%rip), %rdi
     call ler_numero
     cmp $0, %rax
     je verifica_loop

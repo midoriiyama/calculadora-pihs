@@ -1,5 +1,5 @@
 .global ler_numero, ler_operador, erro_operador, limpar_buffer
-.global mostrar_resultado, mostrar_resultado_float, continuar, msg_in_op1, msg_in_op2
+.global mostrar_resultado, mostrar_resultado_float, continuar, msg_in
 .global soma, subtracao, multiplicacao, divisao, exponenciacao
 .global combinacao, arranjo, logaritmo, fatorial, inverso, raiz, primo
 .global verifica_zero, verifica_int_nao_negativo, verifica_menor_ac
@@ -7,11 +7,9 @@
 
 
 .section .data
-    msg_in_op1: .asciz "Digite o primeiro operando: "
-    msg_in_operador: .asciz "Digite o operador: " 
-    msg_in_op2: .asciz "Digite o segundo operando: "
+    msg_in: .asciz "Digite a expressão:\n"
     
-    msg_resultado:       .asciz "O resultado é: %lld\n"
+    msg_resultado: .asciz "O resultado é: %lld\n"
     msg_resultado_float: .asciz "O resultado é: %lf\n"
 
     msg_operando_invalido: .asciz "O operando é inválido.\n"
@@ -46,9 +44,6 @@ ler_numero:
     and $-16, %rsp
     sub $16, %rsp          
 
-    xor %rax, %rax
-    call printf
-
     lea fmt_double(%rip), %rdi
     lea (%rsp), %rsi
     xor %rax, %rax
@@ -79,11 +74,6 @@ ler_operador:
     mov %rsp, %rbp
     and $-16, %rsp
     sub $16, %rsp
-
-    lea msg_in_operador(%rip), %rdi
-    mov %rsp, %rsi
-    xor %rax, %rax
-    call printf
 
     xor %rax, %rax
     lea fmt_op(%rip), %rdi
@@ -129,20 +119,6 @@ loop_limpar_buffer:
     jmp loop_limpar_buffer 
 
 fim_limpar_buffer:
-    mov %rbp, %rsp
-    pop %rbp
-    ret
-
-
-verifica_erro_operador:
-    push %rbp
-    mov %rsp, %rbp
-    and $-16, %rsp
-
-    xor %rax, %rax
-    lea msg_operador_invalido(%rip), %rdi
-    call printf
-
     mov %rbp, %rsp
     pop %rbp
     ret
