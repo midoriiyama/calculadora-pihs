@@ -809,7 +809,7 @@ salvar_variavel:
 
     mov %rdi, %rdx
     lea fmt_double(%rip), %rsi
-    mov 2(%r12), %rdi
+    lea 2(%r12), %rdi
 
     xor %rax, %rax
     call sscanf
@@ -817,6 +817,7 @@ salvar_variavel:
     mov $1, %rax
     jmp sair_salvar_variavel
 
+    
 nao_e_variavel:
     xor %rax, %rax
 

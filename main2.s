@@ -96,13 +96,13 @@ verifica_operador2:
 
 foi_salvo_como_funcao:
     xor %rax, %rax
-    movq msg_out_funcao(%rip), %rdi
+    lea msg_out_funcao(%rip), %rdi
     call printf
     jmp loop_principal
 
 foi_salvo_como_variavel:
     xor %rax, %rax
-    movq msg_out_variavel(%rip), %rdi
+    lea msg_out_variavel(%rip), %rdi
     call printf
     jmp loop_principal
 
