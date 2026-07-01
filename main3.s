@@ -27,16 +27,85 @@ main:
     cmp $1, %rax
     je .foi_salvo_como_variavel
 
-        call salvar_variavel
+    call salvar_variavel
     cmp $1, %rax
     je .foi_salvo_como_variavel
 
     # %r12 vai ser o nosso "dedo" apontando e percorrendo o texto
-    lea buffer_linha(%rip), %r12    
+    lea buffer_linha(%rip), %r12 
 
-    # ==============================================================
-    # LENDO A EXPRESSÃO DA MEMÓRIA
-    # ==============================================================
+    
+     
+
+    call avaliar_expressao
+
+    # Quando retornar do 'call', a conta toda foi resolvida e está no %xmm0!
+    movsd %xmm0, resultado(%rip)
+    call mostrar_resultado_float
+    jmp .verifica_loop
+
+# ====================================================================
+# AVALIADOR RECURSIVO DE EXPRESSÕES (O "CÉREBRO" DA CALCULADORA)
+# ====================================================================
+avaliar_expressao:
+    push %rbp
+    mov %rsp, %rbp
+
+    # --- O INTERCEPTADOR: É UMA CHAMADA DE FUNÇÃO? (Ex: f(3)) ---
+    movzbl (%r12), %eax            # Lê o 1º caractere
+    cmpb $'a', %al
+    jl .leitura_normal             # Não é letra, segue a vida
+    cmpb $'z', %al
+    jg .leitura_normal             # Não é letra, segue a vida
+
+    movzbl 1(%r12), %ecx           # Olha o 2º caractere (sem avançar %r12)
+    cmpb $'(', %cl
+    jne .leitura_normal            # Se não for '(', é conta normal (ex: a+5)
+
+    # --- É UMA FUNÇÃO! VAMOS USAR A PILHA (STACK) ---
+    
+    # 1. Encontra a string salva da fórmula (ex: "x+3") no lista_fun
+    subb $97, %al
+    movzbq %al, %rax
+    shlq $5, %rax                  # Multiplica índice por 32 (tamanho da string)
+    lea lista_fun(%rip), %r13
+    addq %rax, %r13                # %r13 agora aponta para a fórmula na memória
+
+    # 2. Lê o número de dentro do parêntese
+    addq $2, %r12                  # Pula o "f("
+    xor %rax, %rax
+    call ler_numero                # Nosso sscanf otimizado lê o número e deixa no %xmm0
+
+    # 3. Faz o Backup do 'x' antigo na pilha
+    lea lista_var(%rip), %rdi
+    movq 184(%rdi), %r14           # Pega os 8 bytes da gaveta do 'x' (deslocamento 184)
+    push %r14                      # Guarda em segurança no topo da pilha
+
+    # 4. Injeta o novo valor (do %xmm0) na variável 'x'
+    movsd %xmm0, 184(%rdi)
+
+    # 5. Backup do ponteiro da string principal
+    push %r12                      # Empilha onde paramos de ler na string principal
+
+    # 6. Aponta o %r12 para a fórmula e resolve!
+    mov %r13, %r12                 # Muda o ponteiro para o texto "x+3"
+    call avaliar_expressao         # RECURSÃO! Chama a si mesma para resolver a função!
+
+    # 7. Restaura o estado original (Desempilha na ordem inversa)
+    pop %r12                       # Recupera o ponteiro da string original
+    addq $1, %r12                  # Pula o caractere de fechamento ')'
+
+    pop %r14                       # Recupera o valor do 'x' antigo
+    lea lista_var(%rip), %rdi
+    movq %r14, 184(%rdi)           # Devolve pra gaveta silenciosamente
+
+    jmp .fim_avaliar            # Terminou a função! Vai embora com o resultado em %xmm0!
+
+# ====================================================================
+# FLUXO DA CALCULADORA NORMAL
+# ====================================================================
+.leitura_normal:
+
 .ler_primeiro_operando:
     movzbl (%r12), %eax            # Lê o 1º caractere
     cmpb $'a', %al
@@ -282,6 +351,12 @@ main:
     cmp $1, %rax
     je .loop_principal
     jmp .finalizar
+
+    # --- FINALIZADOR DO AVALIADOR ---
+    .fim_avaliar:
+        mov %rbp, %rsp                 # Restaura a pilha
+        pop %rbp                       
+        ret 
 
     .finalizar:
     mov %rbp, %rsp
