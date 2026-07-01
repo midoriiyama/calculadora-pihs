@@ -1,5 +1,8 @@
 .section .text
-.global 
+.section .text
+.global verifica_divisao, verifica_ac, verifica_logaritmo, verifica_fatorial, verifica_inverso, verifica_raiz, erro_operador
+.global ler_numero, ler_operador, mostrar_resultado, mostrar_resultado_float
+.global soma, subtracao, multiplicacao, divisao, exponenciacao, combinacao, arranjo, logaritmo, fatorial, inverso, raiz, primo
 
 .section .data
     msg_in_op1: .asciz "Digite o primeiro operando: "
@@ -23,10 +26,11 @@
     fmt_in:	.asciz "%lld"
     fmt_op: .asciz " %c"
     fmt_out_int: .asciz "%lld\n"
-    fmt_out_double: .asciz "%lf"
+    fmt_double: .asciz "%lf"
+
 
 .section .bss
-
+    .comm resultado_float, 8
 .section .text
 
 ler_numero:
@@ -72,7 +76,7 @@ ler_operador:
 
     xor %rax, %rax
     lea fmt_op(%rip), %rdi
-    lea %rsp, %rsi
+    mov %rsp, %rsi
     call scanf
 
     movq (%rsp), %rax
@@ -104,20 +108,18 @@ loop_limpar_buffer:
     call getchar # le o char q ta no buffer esperando ser armazenado e descarta
 
     cmp $10, %eax # ASCII(10) = ('\n' / Enter)
-    je fim_limpar
+    je fim_limpar_buffer
 
     cmp $-1, %eax # ASCII(-1) = EOF    
-    je fim_limpar
+    je fim_limpar_buffer
 
-    jmp loop_limpar 
+    jmp loop_limpar_buffer 
 
 fim_limpar_buffer:
     mov %rbp, %rsp
     pop %rbp
     ret
 
-
-ler_operador:
 
 verifica_erro_operador:
     push %rbp
@@ -467,6 +469,7 @@ verifica_zero: # serve para divisao, e inverso (lembrar de trocar para o xmm1)
     cvtsi2sd %rax, %xmm1
     comisd %xmm0, %xmm1
     je eh_zero
+    movq $1, %rax 
 
 finaliza:
     mov %rbp, %rsp
@@ -474,31 +477,31 @@ finaliza:
     ret
 
 eh_zero:
-    xor %rax. %rax
+    xor %rax, %rax
     lea msg_erro_zero(%rip), %rdi
     call printf
     
     jmp finaliza
 
 
-verifica_int_nao_negativo: # serve para fatorial, e uma parte do ac
-    push %rbp
-    mov %rsp, %rbp
-    
+verifica_int_nao_negativo:
     cvttsd2si %xmm0, %rax
     cvtsi2sd %rax, %xmm1
-
     comisd %xmm0, %xmm1
     jne nao_e_inteiro_nao_negativo
 
     pxor %xmm1, %xmm1
-    comisd %xmm0, %xmm1
-    jb nao_e_inteiro_nao_negativo
+    comisd %xmm1, %xmm0        # xmm0 CMP xmm1(=0): testa se xmm0 >= 0
+    jb nao_e_inteiro_nao_negativo   # se xmm0 < 0 → erro
+
+    movq $1, %rax              # ← sucesso
+    jmp fim_verifica_int_nao_negativo
 
 nao_e_inteiro_nao_negativo:
     xor %rax, %rax
     lea msg_erro_int(%rip), %rdi
     call printf
+    xor %rax, %rax
 
 fim_verifica_int_nao_negativo:
     mov %rbp, %rsp
@@ -527,6 +530,31 @@ fim_verifica_menor_ac:
     ret
 
 
+verifica_ac:
+    push %rbp
+    mov %rsp, %rbp
+
+    # verifica se n (xmm0) é inteiro não negativo
+    call verifica_int_nao_negativo
+    cmp $0, %rax
+    je fim_verifica_ac
+
+    # verifica se p (xmm1) é inteiro não negativo
+    movsd %xmm1, %xmm0
+    call verifica_int_nao_negativo
+    cmp $0, %rax
+    je fim_verifica_ac
+
+    # verifica se n >= p
+    cvttsd2si operando1(%rip), %rdi
+    cvttsd2si operando2(%rip), %rsi
+    call verifica_menor_ac
+
+fim_verifica_ac:
+    mov %rbp, %rsp
+    pop %rbp
+    ret
+    
 verifica_logaritmo:
     push %rbp
     mov %rsp, %rbp

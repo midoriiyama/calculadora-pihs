@@ -10,6 +10,7 @@
 main:
     push %rbp
     mov %rsp, %rbp
+    and $-16, %rsp
 
 loop_principal:
 
@@ -179,6 +180,7 @@ chamar_logaritmo:
 
 chamar_inverso:
     # pra verificar tem que estar no xmm1
+    movsd operando1(%rip), %xmm1
     call verifica_zero
     cmp $0, %rax
     je verifica_loop
