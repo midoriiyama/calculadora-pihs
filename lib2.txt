@@ -36,6 +36,7 @@
     .comm resultado_float, 8
     .comm continuar_char, 8
     .comm lista_var, 416
+    .comm lista_fun, 
     
 .section .text
 
