@@ -3,7 +3,7 @@
 .global verifica_divisao, verifica_ac, verifica_logaritmo, verifica_fatorial, verifica_inverso, verifica_raiz, erro_operador
 .global ler_numero, ler_operador, mostrar_resultado, mostrar_resultado_float
 .global soma, subtracao, multiplicacao, divisao, exponenciacao, combinacao, arranjo, logaritmo, fatorial, inverso, raiz, primo
-
+.global msg_in_op1, msg_in_op2, verifica_zero, verifica_int_nao_negativo, continuar
 .section .data
     msg_in_op1: .asciz "Digite o primeiro operando: "
     msg_in_operador: .asciz "Digite o operador: " 
@@ -36,7 +36,7 @@
 ler_numero:
     push %rbp
     mov %rsp, %rbp
-    
+    and $-16, %rsp
     sub $16, %rsp          
 
     xor %rax, %rax
@@ -66,7 +66,7 @@ finalizar_ler_numero:
 ler_operador:
     push %rbp
     mov %rsp, %rbp
-
+    and $-16, %rsp
     sub $16, %rsp
 
     lea msg_in_operador(%rip), %rdi
@@ -88,7 +88,8 @@ ler_operador:
 erro_operador:
     push %rbp
     mov %rsp, %rbp
-    
+    and $-16, %rsp
+
     xor %rax, %rax
     lea msg_operador_invalido(%rip), %rdi
     call printf
@@ -124,7 +125,8 @@ fim_limpar_buffer:
 verifica_erro_operador:
     push %rbp
     mov %rsp, %rbp
-    
+    and $-16, %rsp
+
     xor %rax, %rax
     lea msg_operador_invalido(%rip), %rdi
     call printf
@@ -464,6 +466,7 @@ fim_primo:
 verifica_zero: # serve para divisao, e inverso (lembrar de trocar para o xmm1)
     push %rbp
     mov %rsp, %rbp
+    and $-16, %rsp
 
     xor %rax, %rax
     cvtsi2sd %rax, %xmm1
@@ -512,6 +515,7 @@ fim_verifica_int_nao_negativo:
 verifica_menor_ac:
     push %rbp
     mov %rsp, %rbp
+    and $-16, %rsp
 
     cmpq %rsi, %rdi # compara n e p
     jl nao_pode_menor_ac
@@ -558,6 +562,7 @@ fim_verifica_ac:
 verifica_logaritmo:
     push %rbp
     mov %rsp, %rbp
+    and $-16, %rsp
 
     # xmm0 = logaritmando, xmm1 = base (double)
     pxor %xmm2, %xmm2
@@ -595,6 +600,7 @@ fim_verifica_logaritmo:
 verifica_raiz:
     push %rbp
     mov %rsp, %rbp
+    and $-16, %rsp
 
     pxor %xmm1, %xmm1
     comisd %xmm1, %xmm0     # xmm0 = operando

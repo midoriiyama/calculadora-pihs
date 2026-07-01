@@ -7,6 +7,7 @@
     .comm operando2, 8
     .comm resultado, 8
 
+.section .text
 main:
     push %rbp
     mov %rsp, %rbp
@@ -198,7 +199,7 @@ mostra_resultado_float:
     jmp verifica_loop
 
 verifica_loop:
-    call continuar
+    # call continuar
 
     cmp $1, %rax
     je loop_principal
