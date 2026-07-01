@@ -1,9 +1,10 @@
-.section .text
-.section .text
-.global verifica_divisao, verifica_ac, verifica_logaritmo, verifica_fatorial, verifica_inverso, verifica_raiz, erro_operador
-.global ler_numero, ler_operador, mostrar_resultado, mostrar_resultado_float
-.global soma, subtracao, multiplicacao, divisao, exponenciacao, combinacao, arranjo, logaritmo, fatorial, inverso, raiz, primo
-.global continuar, msg_in_op1, msg_in_op2, verifica_zero, verifica_int_nao_negativo, continuar
+.global ler_numero, ler_operador, erro_operador, limpar_buffer
+.global mostrar_resultado, mostrar_resultado_float, continuar, msg_in_op1, msg_in_op2
+.global soma, subtracao, multiplicacao, divisao, exponenciacao
+.global combinacao, arranjo, logaritmo, fatorial, inverso, raiz, primo
+.global verifica_zero, verifica_int_nao_negativo, verifica_menor_ac
+.global verifica_ac, verifica_logaritmo, verifica_raiz
+
 
 .section .data
     msg_in_op1: .asciz "Digite o primeiro operando: "
@@ -60,7 +61,11 @@ ler_numero:
     jmp finalizar_ler_numero
 
 erro_ler_numero:
-    call limpar_buffer     
+    call limpar_buffer  
+
+    lea msg_operando_invalido(%rip), %rdi
+    xor %rax, %rax
+    call printf
 
     xor %rax, %rax        
 
@@ -675,5 +680,3 @@ fim_verifica_raiz:
     mov %rbp, %rsp
     pop %rbp
     ret
-
-

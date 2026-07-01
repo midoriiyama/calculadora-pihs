@@ -104,6 +104,7 @@ chamar_divisao:
 
     movsd operando1(%rip), %xmm0
     movsd operando2(%rip), %xmm1
+    
     call divisao
     movsd %xmm0, resultado_float(%rip)
     jmp mostra_resultado_float

@@ -2,34 +2,44 @@
 .global operando1, operador, operando2
 
 .section .bss
-    .comm operando1, 8      # double
+    .comm operando1, 8
     .comm operador, 8
-    .comm operando2, 8      # double
-    .comm resultado, 8      # inteiro (usado por fatorial, primo, combinacao, arranjo)
-    .comm resultado_str, 8
+    .comm operando2, 8
+    .comm resultado, 8
 
 .section .text
-
 main:
     push %rbp
     mov %rsp, %rbp
+    and $-16, %rsp
 
-loop:
-    
+loop_principal:
+
+    lea msg_in_op1(%rip), %rdi
     call ler_numero
-
     cmp $0, %rax
-    je finalizar
-    
+    je verifica_loop
     movsd %xmm0, operando1(%rip)
 
     call ler_operador
     movb %al, operador(%rip)
-
-    mov operador(%rip), %al
-
     movsd operando1(%rip), %xmm0
+    jmp verifica_operador1
 
+dois_operando:
+
+    lea msg_in_op2(%rip), %rdi
+    call ler_numero
+    cmp $0, %rax
+    je verifica_loop
+    movsd %xmm0, operando2(%rip)
+
+    movb operador(%rip), %al
+    movsd operando1(%rip), %xmm0
+    movsd operando2(%rip), %xmm1
+    jmp verifica_operador2
+    
+verifica_operador1:
     cmpb $'!', %al
     je chamar_fatorial
 
@@ -42,17 +52,9 @@ loop:
     cmpb $'i', %al
     je chamar_inverso
 
-    call ler_numero
-    cmp $0, %rax
-    je finalizar
+    jmp dois_operando
 
-    movsd %xmm0, operando2(%rip)
-
-    movb operador(%rip), %al
-    movsd operando1(%rip), %xmm0
-    movsd operando2(%rip), %xmm1
-
-    # Compara o operador e chama a função correspondente
+verifica_operador2:
     cmpb $'+', %al
     je chamar_soma
 
@@ -76,11 +78,9 @@ loop:
 
     cmpb $'l', %al
     je chamar_logaritmo
-
-    call erro_operador
     
-    jmp finalizar
-
+    call erro_operador
+    jmp verifica_loop
 
 chamar_soma:
     call soma
@@ -98,44 +98,47 @@ chamar_multiplicacao:
     jmp mostra_resultado_float
 
 chamar_divisao:
-    # divisor (operando2) precisa estar em xmm1 para a verificação
-    call verifica_divisao
-
+    call verifica_zero
     cmp $0, %rax
-    je finalizar
+    je verifica_loop
 
+    movsd operando1(%rip), %xmm0
+    movsd operando2(%rip), %xmm1
+    
     call divisao
     movsd %xmm0, resultado_float(%rip)
     jmp mostra_resultado_float
 
 chamar_fatorial:
-    cvttsd2si operando1(%rip), %rdi   # trunca operando1 (double) para inteiro
-
-    call verifica_fatorial
-
+    # o valor para verificar precisa estar em %xmm0
+    call verifica_int_nao_negativo
     cmp $0, %rax
-    je finalizar
+    je verifica_loop
 
+    cvttsd2si operando1(%rip), %rdi
+    
     call fatorial
     movq %rax, resultado(%rip)
     jmp mostra_resultado
-
+    
 chamar_exponenciacao:
-    # base em xmm0 (double), expoente truncado para inteiro em rdi
+    # o valor para verificar precisa estar em %xmm0
+    movsd operando2(%rip), %xmm0
+    call verifica_int_nao_negativo
+    cmp $0, %rax
+    je verifica_loop
+    
+    movsd operando1(%rip), %xmm0
     cvttsd2si operando2(%rip), %rdi
-
     call exponenciacao
+    
     movsd %xmm0, resultado_float(%rip)
     jmp mostra_resultado_float
-
+    
 chamar_combinacao:
-    cvttsd2si operando1(%rip), %rdi   # n
-    cvttsd2si operando2(%rip), %rsi   # p
-
     call verifica_ac
-
     cmp $0, %rax
-    je finalizar
+    je verifica_loop
 
     cvttsd2si operando1(%rip), %rdi
     cvttsd2si operando2(%rip), %rsi
@@ -145,13 +148,9 @@ chamar_combinacao:
     jmp mostra_resultado
 
 chamar_arranjo:
-    cvttsd2si operando1(%rip), %rdi   # n
-    cvttsd2si operando2(%rip), %rsi   # k
-
     call verifica_ac
-
     cmp $0, %rax
-    je finalizar
+    je verifica_loop
 
     cvttsd2si operando1(%rip), %rdi
     cvttsd2si operando2(%rip), %rsi
@@ -162,28 +161,26 @@ chamar_arranjo:
 
 chamar_raiz:
     call verifica_raiz
-
     cmp $0, %rax
-    je finalizar
+    je verifica_loop
 
     call raiz
     movsd %xmm0, resultado_float(%rip)
     jmp mostra_resultado_float
 
 chamar_primo:
-    cvttsd2si operando1(%rip), %rdi   # trunca operando1 para inteiro
+    roundsd $2, %xmm0, %xmm0
+    cvttsd2si %xmm0, %rdi
 
     call primo
     movq %rax, resultado(%rip)
     jmp mostra_resultado
 
 chamar_logaritmo:
-    # xmm0 = logaritmando (operando1), xmm1 = base (operando2)
     call verifica_logaritmo
-
     cmp $0, %rax
-    je finalizar
-
+    je verifica_loop
+    
     movsd operando1(%rip), %xmm0
     movsd operando2(%rip), %xmm1
 
@@ -192,30 +189,35 @@ chamar_logaritmo:
     jmp mostra_resultado_float
 
 chamar_inverso:
-    call verifica_inverso
-
+    # pra verificar tem que estar no xmm1
+    movsd operando1(%rip), %xmm1
+    call verifica_zero
     cmp $0, %rax
-    je finalizar
+    je verifica_loop
 
+    movsd operando1(%rip), %xmm0
     call inverso
     movsd %xmm0, resultado_float(%rip)
     jmp mostra_resultado_float
-
+    
 mostra_resultado:
     call mostrar_resultado
-    jmp finalizar
+    jmp verifica_loop
 
 mostra_resultado_float:
     call mostrar_resultado_float
+    jmp verifica_loop
+
+verifica_loop:
+    call continuar
+    cmp $1, %rax
+    je loop_principal
     jmp finalizar
 
 finalizar:
-
-    jmp loop
-
     mov %rbp, %rsp
     pop %rbp
 
-    mov $60, %rax     # syscall exit
-    xor %rdi, %rdi      # código de retorno 0
+    mov $60, %rax
+    xor %rdi, %rdi
     syscall
