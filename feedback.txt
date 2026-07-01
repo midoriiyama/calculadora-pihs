@@ -1,0 +1,75 @@
+Vou ler os dois arquivos assembly primeiro para entender o que já foi implementado.Analisei os dois arquivos com cuidado. Aqui está meu diagnóstico completo:
+
+---
+
+## Bugs e problemas que podem custar nota no Trabalho 1
+
+### 🔴 Bugs críticos
+
+**1. `main.s` linha 206 — loop não funciona corretamente**
+Após `mostra_resultado` e `mostra_resultado_float`, você faz `jmp finalizar`, e `finalizar` apenas faz `jmp loop`. As instruções de `mov %rbp, %rsp` / `pop %rbp` / `syscall` nunca são alcançadas. O programa nunca termina de verdade — ok que faz loop, mas falta a pergunta "deseja continuar?" que o enunciado exige. **Isso é um requisito explícito e está faltando.**
+
+**2. `verifica_ac` não valida se os operandos são inteiros**
+O enunciado exige checar se os operandos *não são inteiros* (ex: 3.5 `c` 2.1 deveria dar erro). A função só checa negatividade com `cmpq $0, %rdi`, mas já recebeu o valor truncado pelo `cvttsd2si` — a comparação entre o double original e o truncado nunca acontece. Você precisa comparar o `double` original com sua versão convertida de volta pra `double`.
+
+**3. `verifica_fatorial` — mesmo problema acima**
+Recebe já o valor truncado em `%rdi`, sem verificar se o double original era inteiro.
+
+**4. `fatorial` com `rdi = 0` retorna 0 em vez de 1**
+Quando `%rdi = 0`, o loop começa com `%rcx = 0`, decrementa para `-1`, e a comparação `cmpq $1, %rcx` pula para `fim_fatorial` retornando `%rax = 0`. Mas `0! = 1`. Isso quebra combinação e arranjo que dependem de fatorial.
+
+**5. `combinacao` — chamada de `fatorial` sem preservar registradores corretamente**
+Dentro de `combinacao` você usa `%rbx`, `%rcx`, `%r8` e empilha/desempilha manualmente, mas `fatorial` não preserva `%rbx` (ele é callee-saved na ABI x86-64 e não é salvo em `fatorial`). Isso pode corromper valores.
+
+**6. `verifica_logaritmo` não checa se a base é positiva**
+O enunciado diz: *"a base deve ser um número positivo diferente de 1"*. Sua verificação só checa `base == 1`, não checa `base <= 0`.
+
+**7. `primo` — algoritmo incorreto para o número 1**
+Se o usuário digitar `1`, o algoritmo deveria retornar `2` (próximo primo ≥ 1). O loop divide por `n/2` iterando até 1, e termina retornando `1` — que não é primo.
+
+**8. `exponenciacao` não trata expoente negativo nem zero corretamente para base 0**
+Não é um requisito explícito, mas `0^0` retorna 1 (aceitável) e expoente negativo retorna 1 sempre (silenciosamente errado).
+
+---
+
+### 🟡 Problemas de qualidade/pontuação
+
+**9. Falta a pergunta "deseja continuar?"**
+O enunciado é claro: *"ao final de cada operação deve-se perguntar ao usuário se ele deseja fazer outra operação ou encerrar"*. Hoje o programa simplesmente reinicia o loop sem perguntar nada.
+
+**10. `resultado_float` declarado em dois lugares**
+Está em `.bss` no `lib.s` com `.comm resultado_float, 8`, mas `main.s` usa `resultado_float(%rip)` diretamente sem declarar — funciona porque `.comm` é global, mas é um descuido.
+
+**11. Mensagem de entrada usa `msg_in_numero` genérica para todos os casos**
+Deveria dizer "Digite o primeiro operando" na primeira entrada e "Digite o segundo operando" na segunda, como inclusive existem as strings `msg_in_op1` e `msg_in_op2` definidas mas **nunca usadas**.
+
+**12. `ler_operador` não valida o retorno do `scanf`**
+Se o usuário digitar algo inválido, o operador pode ser lixo de memória.
+
+---
+
+## O que fazer para garantir nota 10
+
+Em ordem de prioridade:
+
+1. **Implemente a pergunta "deseja continuar?"** — é requisito explícito. Crie um procedimento `perguntar_continuar` que lê um char e retorna 0 ou 1.
+2. **Corrija o `fatorial` para `n=0` retornar 1.**
+3. **Corrija a validação de inteiro em `verifica_ac` e `verifica_fatorial`** — compare o double original com `cvttsd2si` + `cvtsi2sd` de volta.
+4. **Corrija `verifica_logaritmo`** para checar base > 0 além de base ≠ 1.
+5. **Corrija `primo`** para tratar entrada 1 (e idealmente 2).
+6. **Use `msg_in_op1` e `msg_in_op2`** nas mensagens corretas — é detalhe mas demonstra capricho.
+7. **Preserve `%rbx` em `fatorial`** com push/pop.
+
+---
+
+## Norte para o Trabalho 2
+
+As principais adições em relação ao Trabalho 1 serão:
+
+**Parser de expressão inline** (`5+3` numa linha só): você vai precisar de uma rotina de leitura que leia a linha inteira como string e depois a parse — identificando o número, operador e segundo número. Isso é a mudança mais trabalhosa.
+
+**Armazenamento de variáveis** (`a=3`): uma tabela simples em `.bss` com pares (nome, valor double) — como o alfabeto tem 26 letras, pode ser um vetor de 26 doubles indexado por `char - 'a'`.
+
+**Definição e chamada de funções** (`f(x)=x+x`, `f(5)`): você vai precisar armazenar a *string* da expressão associada à função e, na chamada, substituir `x` pelo valor e avaliar a expressão — um mini-interpretador. Essa é a parte mais complexa.
+
+A estrutura de `lib.s` com as operações separadas vai se reaproveitar bem no Trabalho 2 — o que muda é principalmente o `main.s` e a camada de parsing/entrada.

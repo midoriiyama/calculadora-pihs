@@ -12,7 +12,9 @@ main:
     mov %rsp, %rbp
 
 loop_principal:
-    call ler_operando1
+
+    lea msg_in_op1(%rip), %rdi
+    call ler_numero
     cmp $0, %rax
     je verifica_loop
     movsd %xmm0, operando1(%rip)
@@ -23,7 +25,9 @@ loop_principal:
     jmp verifica_operador1
 
 dois_operando:
-    call ler_operando2
+
+    lea msg_in_op2(%rip), %rdi
+    call ler_numero
     cmp $0, %rax
     je verifica_loop
     movsd %xmm0, operando2(%rip)

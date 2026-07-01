@@ -5,7 +5,7 @@
 
 .section .data
     # Mensagens para entrada e saída
-    msg_in_op1: .asciz "\Digite o primeiro operando: "
+    msg_in_op1: .asciz "Digite o primeiro operando: "
     msg_in_operador: .asciz "Digite o operador: " 
     msg_in_op2: .asciz "Digite o segundo operando: "
     msg_resultado: .asciz "O resultado é: %lld\n"
@@ -418,17 +418,17 @@ logaritmo:
     movsd %xmm0, (%rsp)         # guarda x na pilha
     movsd %xmm1, 8(%rsp)        # guarda b na pilha
 
-    # --- CALCULAR O log2(x) ---
+    # Calcula o log2(x)
     fld1
     fldl (%rsp) # st(0) = x
     fyl2x # st(0) = log2(x)
 
-    # --- CALCULAR O log2(base) ---
+    # Calcula o log2(bae)
     fld1                   
     fldl 8(%rsp) # st(0) = b e st(1) = log2(x)
     fyl2x # st(0) = log2(b) e st(1) = log2(x)
 
-    # --- MUDANCA DE BASE ---
+    # Mudança de base
     fxch # Troca: st(0) = log2(x) e st(1) = log2(b)
     fdiv %st(1), %st(0) # st(0) = log2(x) / log2(b)
 
