@@ -23,7 +23,7 @@ loop_principal:
 
     call ler_operador
     movb %al, operador(%rip)
-
+    movsd operando1(%rip), %xmm0
     jmp verifica_operador1
 
 dois_operando:
@@ -102,6 +102,8 @@ chamar_divisao:
     cmp $0, %rax
     je verifica_loop
 
+    movsd operando1(%rip), %xmm0
+    movsd operando2(%rip), %xmm1
     call divisao
     movsd %xmm0, resultado_float(%rip)
     jmp mostra_resultado_float
@@ -112,18 +114,23 @@ chamar_fatorial:
     cmp $0, %rax
     je verifica_loop
 
+    cvttsd2si operando1(%rip), %rdi
+    
     call fatorial
     movq %rax, resultado(%rip)
     jmp mostra_resultado
     
 chamar_exponenciacao:
     # o valor para verificar precisa estar em %xmm0
+    movsd operando2(%rip), %xmm0
     call verifica_int_nao_negativo
     cmp $0, %rax
     je verifica_loop
     
+    movsd operando1(%rip), %xmm0
     cvttsd2si operando2(%rip), %rdi
     call exponenciacao
+    
     movsd %xmm0, resultado_float(%rip)
     jmp mostra_resultado_float
     
@@ -161,7 +168,8 @@ chamar_raiz:
     jmp mostra_resultado_float
 
 chamar_primo:
-    cvttsd2si operando1(%rip), %rdi
+    roundsd $2, %xmm0, %xmm0
+    cvttsd2si %xmm0, %rdi
 
     call primo
     movq %rax, resultado(%rip)
@@ -186,6 +194,7 @@ chamar_inverso:
     cmp $0, %rax
     je verifica_loop
 
+    movsd operando1(%rip), %xmm0
     call inverso
     movsd %xmm0, resultado_float(%rip)
     jmp mostra_resultado_float
@@ -199,8 +208,7 @@ mostra_resultado_float:
     jmp verifica_loop
 
 verifica_loop:
-    # call continuar
-
+    call continuar
     cmp $1, %rax
     je loop_principal
     jmp finalizar

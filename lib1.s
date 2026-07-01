@@ -3,7 +3,8 @@
 .global verifica_divisao, verifica_ac, verifica_logaritmo, verifica_fatorial, verifica_inverso, verifica_raiz, erro_operador
 .global ler_numero, ler_operador, mostrar_resultado, mostrar_resultado_float
 .global soma, subtracao, multiplicacao, divisao, exponenciacao, combinacao, arranjo, logaritmo, fatorial, inverso, raiz, primo
-.global msg_in_op1, msg_in_op2, verifica_zero, verifica_int_nao_negativo, continuar
+.global continuar, msg_in_op1, msg_in_op2, verifica_zero, verifica_int_nao_negativo, continuar
+
 .section .data
     msg_in_op1: .asciz "Digite o primeiro operando: "
     msg_in_operador: .asciz "Digite o operador: " 
@@ -15,6 +16,8 @@
     msg_operando_invalido: .asciz "O operando é inválido.\n"
     msg_operador_invalido: .asciz "O operador é inválido.\n"
 
+    msg_continuar: .asciz "Deseja continuar? (s/n): "
+
     msg_erro_zero: .asciz "Erro: Não é possível realizar a operação para 0.\n"
     msg_erro_int: .asciz "Erro: Operando precisa ser um inteiro não negativo.\n"
     msg_erro_neg: .asciz "Erro: Não é possível realizar a operação para valor negativo.\n"
@@ -22,6 +25,7 @@
     msg_erro_op_invalido: .asciz "Erro: Operador inválido.\n"
     msg_erro_log1: .asciz "Erro: Logaritmando deve ser maior que 0.\n"
     msg_erro_log2: .asciz "Erro: A base deve ser um número diferente de 1.\n"
+    msg_erro_continuar: .asciz "Erro: Entrada inválida.\n"
 
     fmt_in:	.asciz "%lld"
     fmt_op: .asciz " %c"
@@ -31,6 +35,8 @@
 
 .section .bss
     .comm resultado_float, 8
+    .comm continuar_char, 8
+    
 .section .text
 
 ler_numero:
@@ -43,7 +49,7 @@ ler_numero:
     call printf
 
     lea fmt_double(%rip), %rdi
-    mov %rsp, %rsi
+    lea (%rsp), %rsi
     xor %rax, %rax
     call scanf
 
@@ -84,6 +90,7 @@ ler_operador:
     mov %rbp, %rsp
     pop %rbp
     ret
+
 
 erro_operador:
     push %rbp
@@ -168,6 +175,50 @@ mostrar_resultado_float:
     mov %rbp, %rsp
     pop %rbp
     ret
+
+
+continuar:
+    push %rbp
+    mov %rsp, %rbp
+    and $-16, %rsp
+    sub $16, %rsp
+
+loop_continuar:
+    xor %rax, %rax
+    lea msg_continuar(%rip), %rdi
+    call printf
+
+    xor %rax, %rax
+    lea fmt_op(%rip), %rdi
+    lea (%rsp), %rsi
+    call scanf
+
+    movq (%rsp), %rbx
+
+    cmpb $'n', %bl
+    je retorna_zero
+
+    cmpb $'s', %bl
+    jne erro_continua
+
+    movq $1, %rax
+    jmp finaliza_continuar
+
+retorna_zero:
+    xor %rax, %rax
+    jmp finaliza_continuar
+
+erro_continua:
+    xor %rax, %rax
+    lea msg_erro_continuar(%rip), %rdi
+    call printf
+    jmp loop_continuar
+
+finaliza_continuar:
+    mov %rbp, %rsp
+    pop %rbp
+    ret
+
 
 soma:
     push %rbp
@@ -469,8 +520,8 @@ verifica_zero: # serve para divisao, e inverso (lembrar de trocar para o xmm1)
     and $-16, %rsp
 
     xor %rax, %rax
-    cvtsi2sd %rax, %xmm1
-    comisd %xmm0, %xmm1
+    cvtsi2sd %rax, %xmm2
+    comisd %xmm2, %xmm1
     je eh_zero
     movq $1, %rax 
 
@@ -483,11 +534,15 @@ eh_zero:
     xor %rax, %rax
     lea msg_erro_zero(%rip), %rdi
     call printf
-    
+    xor %rax, %rax
     jmp finaliza
 
 
 verifica_int_nao_negativo:
+    push %rbp
+    mov %rsp, %rbp
+    and $-16, %rsp
+    
     cvttsd2si %xmm0, %rax
     cvtsi2sd %rax, %xmm1
     comisd %xmm0, %xmm1
@@ -527,6 +582,7 @@ nao_pode_menor_ac:
     xor %rax, %rax
     lea msg_erro_ac(%rip), %rdi
     call printf
+    xor %rax, %rax
 
 fim_verifica_menor_ac:
     mov %rbp, %rsp
