@@ -68,28 +68,36 @@ ler_numero:
     push %rbp
     mov %rsp, %rbp
     and $-16, %rsp
+    
+    # Reservamos 32 bytes na pilha: 8 pro double, e 4 para guardar a contagem do %n
+    sub $32, %rsp      
 
-    lea fmt_double(%rip), %rdi
-    lea buffer_linha(%rip), %rsi
+    # Argumentos do sscanf:
+    mov %r12, %rdi               # 1º Arg: Lê do %r12
+    lea fmt_double_n(%rip), %rsi # 2º Arg: Formato "%lf%n"
+    lea 16(%rsp), %rdx           # 3º Arg: Onde salvar o double
+    lea 24(%rsp), %rcx           # 4º Arg: Onde salvar a contagem do %n
+
     xor %rax, %rax
-    call scanf
+    call sscanf                  # Chama a biblioteca C
 
-    cmp $1, %rax
-    jne .erro_ler_numero
+    cmp $1, %rax                 # Verifica se leu o número com sucesso
+    jl .erro_leitura
 
-    movsd (%rsp), %xmm0
+    movsd 16(%rsp), %xmm0        # Recupera o número convertido
+
+    # ========================================================
+    # A MÁGICA: Avança o %r12 passado o número!
+    # ========================================================
+    movslq 24(%rsp), %rax        # Pega a contagem de caracteres lidos
+    addq %rax, %r12              # Avança o %r12. Agora ele aponta certinho pro '+' !
+
+    mov $1, %rax
     jmp .fim_ler_numero
 
-    .erro_ler_numero:
-    call limpar_buffer  
-
-    lea msg_operando_invalido(%rip), %rdi
-    xor %rax, %rax
-    call printf
-
-    xor %rax, %rax        
-
-    .fim_ler_numero:
+.erro_leitura:
+    mov $0, %rax
+.fim_ler_numero:
     mov %rbp, %rsp
     pop %rbp
     ret
