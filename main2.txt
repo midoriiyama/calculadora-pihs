@@ -27,28 +27,71 @@ main:
     cmp $1, %rax
     je .foi_salvo_como_variavel
 
+        call salvar_variavel
+    cmp $1, %rax
+    je .foi_salvo_como_variavel
+
+    # %r12 vai ser o nosso "dedo" apontando e percorrendo o texto
+    lea buffer_linha(%rip), %r12    
+
+.ler_primeiro_operando:
+    movzbl (%r12), %eax            # Olha para o 1º caractere (ex: 'a' ou '5')
+    cmpb $'a', %al
+    jl .primeiro_e_numero          # Se for menor que 'a', não é variável (é número)
+    cmpb $'z', %al
+    jg .primeiro_e_numero          # Se for maior que 'z', não é variável
+
+    # --- CASO 1: É UMA VARIÁVEL (Ex: "a+5") ---
+    subb $97, %al                  # Acha o índice (a=0, b=1...)
+    movzbq %al, %rax
+    shlq $3, %rax                  # Multiplica por 8 (tamanho double)
+    
+    lea lista_var(%rip), %rdi
+    addq %rax, %rdi                # %rdi aponta para a gaveta certa
+    movsd (%rdi), %xmm0            # Puxa o double da gaveta direto pra xmm0!
+    
+    movsd %xmm0, operando1(%rip)   # Salva em operando1
+    
+    inc %r12                       # MÁGICA: Avança o "dedo" 1 byte pra pular a letra
+    jmp .ler_o_operador            # Vai direto ler o operador (+, -, etc)
+
+.primeiro_e_numero:
+    # --- CASO 2: É UM NÚMERO NORMAL (Ex: "5+a") ---
     xor %rax, %rax
-    call ler_numero
+    call ler_numero                # Aqui chamamos a sua função normal!
 
     cmp $0, %rax
     je .verifica_loop
     movsd %xmm0, operando1(%rip)
 
-    call ler_operador
-    movb %al, operador(%rip)
+.ler_o_operador:
+    # Em vez de chamar ler_operador e sscanf, pegamos o caractere direto de %r12!
+    movzbl (%r12), %eax            # Lê o byte atual (que é o operador, ex: '+')
+    movb %al, operador(%rip)       # Salva na sua variável global "operador"
+    
+    inc %r12                       # Avança o "dedo" mais 1 byte, pulando o operador!
+
+    # Restaura o operando1 no xmm0 e vai para as suas verificações
     movsd operando1(%rip), %xmm0
     jmp .verifica_operador1
 
-    .dois_operando:
+.ler_segundo_operando:
+    movzbl (%r12), %eax            # Olha para o 1º caractere (ex: 'a' ou '5')
+    cmpb $'a', %al
+    jl .primeiro_e_numero          # Se for menor que 'a', não é variável (é número)
+    cmpb $'z', %al
+    jg .primeiro_e_numero          # Se for maior que 'z', não é variável
 
-    call ler_numero
-    cmp $0, %rax
-    je .verifica_loop
-    movsd %xmm0, operando2(%rip)
-
-    movb operador(%rip), %al
-    movsd operando1(%rip), %xmm0
-    movsd operando2(%rip), %xmm1
+    # --- CASO 1: É UMA VARIÁVEL (Ex: "a+5") ---
+    subb $97, %al                  # Acha o índice (a=0, b=1...)
+    movzbq %al, %rax
+    shlq $3, %rax                  # Multiplica por 8 (tamanho double)
+    
+    lea lista_var(%rip), %rdi
+    addq %rax, %rdi                # %rdi aponta para a gaveta certa
+    movsd (%rdi), %xmm0            # Puxa o double da gaveta direto pra xmm0!
+    
+    movsd %xmm0, operando2(%rip)   # Salva em operando1
     jmp .verifica_operador2
     
     .verifica_operador1:
@@ -64,7 +107,7 @@ main:
     cmpb $'i', %al
     je .chamar_inverso
 
-    jmp .dois_operando
+    jmp .verifica_operador2
 
     .verifica_operador2:
     cmpb $'+', %al

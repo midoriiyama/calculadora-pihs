@@ -69,37 +69,16 @@ ler_numero:
     mov %rsp, %rbp
     and $-16, %rsp
 
-    # Pega ponteiro para posição atual do buffer
-    lea buffer_linha(%rip), %rsi
-    movzbl (%rsi), %eax
-
-    # Caso 1: é letra isolada → variável
-    # verificar: é letra E o próximo char é espaço/operador/nulo
-    cmpb $'a', %al
-    jl .tentar_numero
-    cmpb $'z', %al
-    jg .tentar_numero
-    call buscar_variavel
-    jmp fim_ler_numero
-
-    # Caso 2: é "f(" → chamada de função
-    .tentar_funcao:
-    movzbl 1(%rsi), %ebx
-    cmpb $'(', %bl
-    jne .tentar_numero
-    call avaliar_expressao_funcao
-    jmp fim_ler_numero
-
-    # Caso 3: número literal → sscanf como antes
-    .tentar_numero:
     lea fmt_double(%rip), %rdi
-    call sscanf
+    lea buffer_linha(%rip), %rsi
+    xor %rax, %rax
+    call scanf
 
     cmp $1, %rax
     jne .erro_ler_numero
 
     movsd (%rsp), %xmm0
-    jmp .finalizar_ler_numero
+    jmp .fim_ler_numero
 
     .erro_ler_numero:
     call limpar_buffer  
@@ -532,7 +511,7 @@ primo:
 
     movq %rax, %rcx
 
-    jmp loop_primo
+    jmp .loop_primo
 
     .fim_primo:
     movq %rdi, %rax
@@ -779,7 +758,7 @@ salvar_funcao:
     # Retorna 0 (Não era uma função)
     mov $0, %rax
 
-    sair_salvar_funcao:
+    .sair_salvar_funcao:
     # Epílogo: Restaura os ponteiros da pilha e encerra [4]
     mov %rbp, %rsp
     pop %rbp
