@@ -828,6 +828,3 @@ salvar_variavel:
     mov %rbp, %rsp
     pop %rbp
     ret
-
-
-
