@@ -3,457 +3,395 @@
 
 .section .bss
     .comm operando1, 8
-    .comm operador,  8
+    .comm operador, 8
     .comm operando2, 8
     .comm resultado, 8
     .comm buffer_linha, 256
 
 .section .text
 
-# ====================================================================
-# MAIN
-# ====================================================================
 main:
     push %rbp
     mov  %rsp, %rbp
     and  $-16, %rsp
 
-.loop_principal:
+    .loop_principal:
+    
     call ler_buffer
-
+    
     call salvar_funcao
-    cmp  $1, %rax
-    je   .foi_salvo_como_funcao
+    cmp $1, %rax
+    je .foi_salvo_como_funcao
 
     call salvar_variavel
-    cmp  $1, %rax
-    je   .foi_salvo_como_variavel
+    cmp $1, %rax
+    je .foi_salvo_como_variavel
 
-    lea  buffer_linha(%rip), %r12
+    lea buffer_linha(%rip), %r12
 
     call avaliar_expressao
     movsd %xmm0, resultado_float(%rip)
     call mostrar_resultado_float
-    jmp  .verifica_loop
+    jmp .loop_principal
 
-.foi_salvo_como_funcao:
-    xor  %rax, %rax
-    lea  msg_out_funcao(%rip), %rdi
+    .foi_salvo_como_funcao:
+    xor %rax, %rax
+    lea msg_out_funcao(%rip), %rdi
     call printf
-    jmp  .loop_principal
+    jmp .loop_principal
 
-.foi_salvo_como_variavel:
-    xor  %rax, %rax
-    lea  msg_out_variavel(%rip), %rdi
+    .foi_salvo_como_variavel:
+    xor %rax, %rax
+    lea msg_out_variavel(%rip), %rdi
     call printf
-    jmp  .loop_principal
+    jmp .loop_principal
 
-.verifica_loop:
-    call continuar
-    cmp  $1, %rax
-    je   .loop_principal
-
-.finalizar:
-    mov  %rbp, %rsp
-    pop  %rbp
-    mov  $60, %rax
-    xor  %rdi, %rdi
+    .finalizar:
+    mov %rbp, %rsp
+    pop %rbp
+    mov $60, %rax
+    xor %rdi, %rdi
     syscall
 
-
-# ====================================================================
-# AVALIADOR RECURSIVO DE EXPRESSÕES
-#
-# Entrada:  %r12 apontando para a expressão
-# Saída:    %xmm0 com o resultado
-# %r12 é avançado conforme a expressão é consumida
-# ====================================================================
+# %r12 aponta para o buffer que armazena a expressão
 avaliar_expressao:
     push %rbp
     mov  %rsp, %rbp
+    
     push %rbx
     push %r13
     push %r14
     push %r15
-    sub  $8, %rsp           # alinha pilha em 16 bytes
+    sub $8, %rsp           # alinha pilha em 16 bytes
 
-    # ------------------------------------------------------------------
-    # PULA ESPAÇOS no início
-    # ------------------------------------------------------------------
-.pula_espaco_inicio:
+    # Verifica se a primeira posição é uma letra (variável ou função) ou número
+    .verificar_tipo:
     movzbl (%r12), %eax
-    cmpb   $' ', %al
-    jne    .verificar_tipo
-    inc    %r12
-    jmp    .pula_espaco_inicio
 
-    # ------------------------------------------------------------------
-    # VERIFICA TIPO DO PRIMEIRO TOKEN
-    # ------------------------------------------------------------------
-.verificar_tipo:
-    movzbl (%r12), %eax
-    cmpb   $'a', %al
-    jl     .primeiro_e_numero
-    cmpb   $'z', %al
-    jg     .primeiro_e_numero
+    cmpb $'a', %al
+    jl .primeiro_e_numero
+    cmpb $'z', %al
+    jg .primeiro_e_numero
 
-    # É letra. Próximo char é '(' → chamada de função
+    # Caso em que é letra. Se o próximo char = '(' confere se é chamada de função
     movzbl 1(%r12), %ecx
-    cmpb   $'(', %cl
-    je     .e_chamada_funcao
+    cmpb $'(', %cl
+    je .e_chamada_funcao
 
-    # ------------------------------------------------------------------
-    # PRIMEIRO OPERANDO É VARIÁVEL SIMPLES
-    # ------------------------------------------------------------------
-    subb   $97, %al
+    # Caso em que é variável simples
+    subb $97, %al
     movzbq %al, %rax
-    shlq   $3, %rax
-    lea    lista_var(%rip), %rdi
-    addq   %rax, %rdi
-    movsd  (%rdi), %xmm0
-    movsd  %xmm0, operando1(%rip)
-    inc    %r12
-    jmp    .ler_operador
+    shlq $3, %rax
 
-    # ------------------------------------------------------------------
-    # PRIMEIRO OPERANDO É NÚMERO LITERAL
-    # ------------------------------------------------------------------
-.primeiro_e_numero:
-    call   ler_numero
-    movsd  %xmm0, operando1(%rip)
-    jmp    .ler_operador
+    # %rdi <- endereço da lista
+    lea lista_var(%rip), %rdi
+    # %rdi <- endereco da lista + deslocamento
+    addq %rax, %rdi
+    movsd (%rdi), %xmm0
+    movsd %xmm0, operando1(%rip)
 
-    # ------------------------------------------------------------------
-    # PRIMEIRO OPERANDO É CHAMADA DE FUNÇÃO  f(arg)
-    # ------------------------------------------------------------------
-.e_chamada_funcao:
+    # Avança o ponteiro para o próximo (o operador)
+    inc %r12    
+    jmp .ler_operador
+
+    # Caso em que é número
+    .primeiro_e_numero:
+    call ler_numero
+    movsd %xmm0, operando1(%rip)
+    jmp .ler_operador
+
+    # Caso em que é chamada de função
+    .e_chamada_funcao:
     movzbl (%r12), %eax
-    movb   %al, %bl                 # %bl = nome da função
+    movb %al, %bl               # %bl = nome da função
 
-    addq   $2, %r12                 # pula "f("
+    addq $2, %r12               # pula "f("
 
-    # Resolve argumento: pode ser variável, função ou número
-    movzbl (%r12), %eax
-    cmpb   $'a', %al
-    jl     .arg_e_numero
-    cmpb   $'z', %al
-    jg     .arg_e_numero
-    movzbl 1(%r12), %ecx
-    cmpb   $'(', %cl
-    je     .arg_e_subfuncao
-    # argumento é variável
-    subb   $97, %al
+    # Confere argumento da função: pode ser variável ou número
+    movzbl (%r12), %eax # f(-> x <-)
+    
+    cmpb $'a', %al
+    jl .arg_e_numero
+    cmpb $'z', %al
+    jg .arg_e_numero
+
+    # Caso em que argumento é uma variável
+    subb $97, %al
     movzbq %al, %rax
-    shlq   $3, %rax
-    lea    lista_var(%rip), %rdi
-    addq   %rax, %rdi
-    movsd  (%rdi), %xmm0
-    inc    %r12
-    jmp    .arg_resolvido
-.arg_e_subfuncao:
-    call   avaliar_expressao
-    jmp    .arg_resolvido
-.arg_e_numero:
-    call   ler_numero
-.arg_resolvido:
+    shlq $3, %rax
 
-    # Salva argumento temporariamente
-    sub    $8, %rsp
-    movsd  %xmm0, (%rsp)
+    lea lista_var(%rip), %rdi
+    addq %rax, %rdi
+    movsd (%rdi), %xmm0
 
-    # Valida e pula ')'
-    movzbl (%r12), %eax
-    cmpb   $')', %al
-    jne    .erro_parentese
-    inc    %r12
+    # Avança ponteiro para o próximo char (o ')')
+    inc %r12
+    jmp .arg_resolvido
 
-    movsd  (%rsp), %xmm0
-    add    $8, %rsp
+    # Caso em que argumento é um número
+    .arg_e_numero:
+    call ler_numero
+    
+    # O valor do argumento foi identificado e está no %xmm0
+    .arg_resolvido:
+    movsd %xmm0, (%rsp) # Salva argumento temporariamente
+    sub $8, %rsp
+
+    movzbl (%r12), %eax 
+    inc %r12 
+    movsd (%rsp), %xmm0
+    add $8, %rsp
+
 
     # Localiza gaveta da função
     movzbq %bl, %rax
-    subb   $97, %al
+    subb $97, %al
     movzbq %al, %rax
-    shlq   $5, %rax
-    lea    lista_fun(%rip), %r13
-    addq   %rax, %r13               # %r13 → gaveta da função
+    shlq $5, %rax
+    lea lista_fun(%rip), %r13
+    addq %rax, %r13               # %r13 → gaveta da função
 
     # Lê char do parâmetro (byte 0 da gaveta)
     movzbl 0(%r13), %ecx
 
     # Calcula offset do parâmetro na lista_var
-    subb   $97, %cl
+    subb $97, %cl
     movzbq %cl, %rcx
-    shlq   $3, %rcx
-    lea    lista_var(%rip), %rdi
-    addq   %rcx, %rdi               # %rdi → gaveta do parâmetro
+    shlq $3, %rcx
+    lea lista_var(%rip), %rdi
+    addq %rcx, %rdi               # %rdi → o endereço do parâmetro na lista_var
 
     # Backup do valor antigo do parâmetro (xmm não tem push)
-    sub    $16, %rsp
-    movsd  (%rdi), %xmm1
-    movsd  %xmm1, (%rsp)            # valor antigo
-    movq   %rdi,  8(%rsp)           # ponteiro da gaveta
+    sub $16, %rsp
+    movsd (%rdi), %xmm1
+    movsd %xmm1, (%rsp)            # valor antigo
+    movq %rdi, 8(%rsp)           # ponteiro da gaveta
 
     # Injeta argumento
-    movsd  %xmm0, (%rdi)
+    movsd %xmm0, (%rdi)
 
     # Backup de %r12 e aponta para a fórmula
-    push   %r12
-    lea    1(%r13), %r12            # pula byte do parâmetro, aponta para a expressão
+    push %r12
+    lea 1(%r13), %r12            # pula byte do parâmetro, aponta para a expressão
 
-    call   avaliar_expressao        # RECURSÃO → %xmm0 = resultado
+    call avaliar_expressao        # RECURSÃO → %xmm0 = resultado
 
     # Restaura
-    pop    %r12
-    movq   8(%rsp), %rdi
-    movsd  (%rsp), %xmm1
-    add    $16, %rsp
-    movsd  %xmm1, (%rdi)           # devolve valor antigo do parâmetro
+    pop %r12
+    movq 8(%rsp), %rdi
+    movsd (%rsp), %xmm1
+    add $16, %rsp
+    movsd %xmm1, (%rdi)           # devolve valor antigo do parâmetro
 
-    movsd  %xmm0, operando1(%rip)
-    jmp    .ler_operador
+    movsd %xmm0, operando1(%rip)
+    jmp .ler_operador
 
-.erro_parentese:
-    add    $8, %rsp
-    jmp    .sair_avaliar
 
-    # ------------------------------------------------------------------
-    # LÊ O OPERADOR
-    # ------------------------------------------------------------------
-.ler_operador:
-.pula_espaco_op:
-    movzbl (%r12), %eax
-    cmpb   $' ', %al
-    jne    .le_char_op
-    inc    %r12
-    jmp    .pula_espaco_op
-
-.le_char_op:
+    .ler_operador:
+    # Lê caractere do operador
     movzbl (%r12), %eax
 
-    # Fim de string → expressão sem operador binário (ex: "f(4)" ou "a" isolado)
+    # Fim de string. Expressão sem operador binário (ex: "f(4)" ou "a" isolado)
     # resultado já está em operando1
-    cmpb   $0,  %al
-    je     .retorna_operando1
-    cmpb   $10, %al
-    je     .retorna_operando1
+    cmpb $0, %al
+    je .retorna_operando1
+    cmpb $10, %al
+    je .retorna_operando1
 
-    movb   %al, operador(%rip)
-    inc    %r12
+    movb %al, operador(%rip)
+    inc %r12
 
-    cmpb   $'!', %al
-    je     .chamar_fatorial
-    cmpb   $'r', %al
-    je     .chamar_raiz
-    cmpb   $'p', %al
-    je     .chamar_primo
-    cmpb   $'i', %al
-    je     .chamar_inverso
+    cmpb $'!', %al
+    je .chamar_fatorial
+    cmpb $'r', %al
+    je .chamar_raiz
+    cmpb $'p', %al
+    je .chamar_primo
+    cmpb $'i', %al
+    je .chamar_inverso  
 
-    # ------------------------------------------------------------------
-    # LÊ O SEGUNDO OPERANDO
-    # ------------------------------------------------------------------
-.ler_segundo_operando:
-.pula_espaco_op2:
+    .ler_segundo_operando:
+    # Lê o segundo operando, que pode ser variável ou número
     movzbl (%r12), %eax
-    cmpb   $' ', %al
-    jne    .le_char_op2
-    inc    %r12
-    jmp    .pula_espaco_op2
-
-.le_char_op2:
-    movzbl (%r12), %eax
-    cmpb   $'a', %al
-    jl     .segundo_e_numero
-    cmpb   $'z', %al
-    jg     .segundo_e_numero
+    cmpb $'a', %al
+    jl .segundo_e_numero
+    cmpb $'z', %al
+    jg .segundo_e_numero
 
     movzbl 1(%r12), %ecx
-    cmpb   $'(', %cl
-    je     .segundo_e_funcao
+    cmpb $'(', %cl
+    je .segundo_e_funcao
 
     # Variável simples
-    subb   $97, %al
+    subb $97, %al
     movzbq %al, %rax
-    shlq   $3, %rax
-    lea    lista_var(%rip), %rdi
-    addq   %rax, %rdi
-    movsd  (%rdi), %xmm0
-    movsd  %xmm0, operando2(%rip)
-    inc    %r12
-    jmp    .fazer_a_conta
+    shlq $3, %rax
+    
+    lea lista_var(%rip), %rdi
+    addq %rax, %rdi
+    
+    movsd (%rdi), %xmm0
+    movsd %xmm0, operando2(%rip)
+    inc %r12
+    jmp .fazer_a_conta
 
-.segundo_e_funcao:
+    .segundo_e_funcao:
     # Salva operando1 E operador antes da recursão
     # (a recursão sobrescreve operador(%rip) globalmente)
-    sub    $16, %rsp
-    movsd  operando1(%rip), %xmm0
-    movsd  %xmm0, (%rsp)           # operando1 nos primeiros 8 bytes
+    sub $16, %rsp
+    movsd operando1(%rip), %xmm0
+    movsd %xmm0, (%rsp)           # operando1 nos primeiros 8 bytes
     movzbl operador(%rip), %eax
-    movb   %al, 8(%rsp)            # operador no byte 8
+    movb %al, 8(%rsp)            # operador no byte 8
 
-    call   avaliar_expressao        # resolve f(...) → %xmm0
+    call avaliar_expressao        # resolve f(...) → %xmm0
 
-    movsd  %xmm0, operando2(%rip)
-    movsd  (%rsp), %xmm0
-    movb   8(%rsp), %al
-    add    $16, %rsp
-    movsd  %xmm0, operando1(%rip)
-    movb   %al, operador(%rip)     # restaura operador original
-    jmp    .fazer_a_conta
+    movsd %xmm0, operando2(%rip)
+    movsd (%rsp), %xmm0
+    movb 8(%rsp), %al
+    add $16, %rsp
+    movsd %xmm0, operando1(%rip)
+    movb %al, operador(%rip)     # restaura operador original
+    jmp .fazer_a_conta
 
-.segundo_e_numero:
-    call   ler_numero
-    movsd  %xmm0, operando2(%rip)
+    .segundo_e_numero:
+    call ler_numero
+    movsd %xmm0, operando2(%rip)
 
-    # ------------------------------------------------------------------
-    # EXECUTA A OPERAÇÃO
-    # ------------------------------------------------------------------
-.fazer_a_conta:
-    movb   operador(%rip), %al
-    movsd  operando1(%rip), %xmm0
-    movsd  operando2(%rip), %xmm1
+    .fazer_a_conta:
+    movb operador(%rip), %al
+    movsd operando1(%rip), %xmm0
+    movsd operando2(%rip), %xmm1
 
-    cmpb   $'+', %al
-    je     .chamar_soma
-    cmpb   $'-', %al
-    je     .chamar_subtracao
-    cmpb   $'*', %al
-    je     .chamar_multiplicacao
-    cmpb   $'/', %al
-    je     .chamar_divisao
-    cmpb   $'^', %al
-    je     .chamar_exponenciacao
-    cmpb   $'c', %al
-    je     .chamar_combinacao
-    cmpb   $'a', %al
-    je     .chamar_arranjo
-    cmpb   $'l', %al
-    je     .chamar_logaritmo
+    cmpb $'+', %al
+    je .chamar_soma
+    cmpb $'-', %al
+    je .chamar_subtracao
+    cmpb $'*', %al
+    je .chamar_multiplicacao
+    cmpb $'/', %al
+    je .chamar_divisao
+    cmpb $'^', %al
+    je .chamar_exponenciacao
+    cmpb $'c', %al
+    je .chamar_combinacao
+    cmpb $'a', %al
+    je .chamar_arranjo
+    cmpb $'l', %al
+    je .chamar_logaritmo
 
-    call   erro_operador
-    jmp    .sair_avaliar
+    call erro_operador
+    jmp .fim_avaliar
 
-.chamar_soma:
-    call   soma
-    jmp    .fim_avaliar
+    .chamar_soma:
+    call soma
+    jmp .fim_avaliar
 
-.chamar_subtracao:
-    call   subtracao
-    jmp    .fim_avaliar
+    .chamar_subtracao:
+    call subtracao
+    jmp .fim_avaliar
 
-.chamar_multiplicacao:
-    call   multiplicacao
-    jmp    .fim_avaliar
+    .chamar_multiplicacao:
+    call multiplicacao
+    jmp .fim_avaliar
 
-.chamar_divisao:
-    call   verifica_zero
-    cmp    $0, %rax
-    je     .sair_avaliar
-    movsd  operando1(%rip), %xmm0
-    movsd  operando2(%rip), %xmm1
-    call   divisao
-    jmp    .fim_avaliar
+    .chamar_divisao:
+    call verifica_zero
+    cmp $0, %rax
+    je .fim_avaliar
+    movsd operando1(%rip), %xmm0
+    movsd operando2(%rip), %xmm1
+    call divisao
+    jmp .fim_avaliar
 
-.chamar_fatorial:
-    movsd  operando1(%rip), %xmm0
-    call   verifica_int_nao_negativo
-    cmp    $0, %rax
-    je     .sair_avaliar
+    .chamar_fatorial:
+    movsd operando1(%rip), %xmm0
+    call verifica_int_nao_negativo
+    cmp $0, %rax
+    je .fim_avaliar
     cvttsd2si operando1(%rip), %rdi
-    call   fatorial
-    cvtsi2sd  %rax, %xmm0
-    jmp    .fim_avaliar
+    call fatorial
+    cvtsi2sd %rax, %xmm0
+    jmp .fim_avaliar
 
-.chamar_exponenciacao:
-    movsd  operando2(%rip), %xmm0
-    call   verifica_int_nao_negativo
-    cmp    $0, %rax
-    je     .sair_avaliar
-    movsd  operando1(%rip), %xmm0
+    .chamar_exponenciacao:
+    movsd operando2(%rip), %xmm0
+    call verifica_int_nao_negativo
+    cmp $0, %rax
+    je .fim_avaliar
+    movsd operando1(%rip), %xmm0
     cvttsd2si operando2(%rip), %rdi
-    call   exponenciacao
-    jmp    .fim_avaliar
+    call exponenciacao
+    jmp .fim_avaliar
 
-.chamar_combinacao:
-    call   verifica_ac
-    cmp    $0, %rax
-    je     .sair_avaliar
+    .chamar_combinacao:
+    call verifica_ac
+    cmp $0, %rax
+    je .fim_avaliar
     cvttsd2si operando1(%rip), %rdi
     cvttsd2si operando2(%rip), %rsi
-    call   combinacao
-    cvtsi2sd  %rax, %xmm0
-    jmp    .fim_avaliar
+    call combinacao
+    cvtsi2sd %rax, %xmm0
+    jmp .fim_avaliar
 
-.chamar_arranjo:
-    call   verifica_ac
-    cmp    $0, %rax
-    je     .sair_avaliar
+    .chamar_arranjo:
+    call verifica_ac
+    cmp $0, %rax
+    je .fim_avaliar
     cvttsd2si operando1(%rip), %rdi
     cvttsd2si operando2(%rip), %rsi
-    call   arranjo
-    cvtsi2sd  %rax, %xmm0
-    jmp    .fim_avaliar
+    call arranjo
+    cvtsi2sd %rax, %xmm0
+    jmp .fim_avaliar
 
-.chamar_raiz:
-    movsd  operando1(%rip), %xmm0
-    call   verifica_raiz
-    cmp    $0, %rax
-    je     .sair_avaliar
-    movsd  operando1(%rip), %xmm0
-    call   raiz
-    jmp    .fim_avaliar
+    .chamar_raiz:
+    movsd operando1(%rip), %xmm0
+    call verifica_raiz
+    cmp $0, %rax
+    je .fim_avaliar
+    movsd operando1(%rip), %xmm0
+    call raiz
+    jmp .fim_avaliar
 
-.chamar_primo:
-    movsd  operando1(%rip), %xmm0
+    .chamar_primo:
+    movsd operando1(%rip), %xmm0
     roundsd $2, %xmm0, %xmm0
     cvttsd2si %xmm0, %rdi
-    call   primo
-    cvtsi2sd  %rax, %xmm0
-    jmp    .fim_avaliar
+    call primo
+    cvtsi2sd %rax, %xmm0
+    jmp .fim_avaliar
 
-.chamar_logaritmo:
-    movsd  operando1(%rip), %xmm0
-    movsd  operando2(%rip), %xmm1
-    call   verifica_logaritmo
-    cmp    $0, %rax
-    je     .sair_avaliar
-    movsd  operando1(%rip), %xmm0
-    movsd  operando2(%rip), %xmm1
-    call   logaritmo
-    jmp    .fim_avaliar
+    .chamar_logaritmo:
+    movsd operando1(%rip), %xmm0
+    movsd operando2(%rip), %xmm1
+    call verifica_logaritmo
+    cmp $0, %rax
+    je .fim_avaliar
+    movsd operando1(%rip), %xmm0
+    movsd operando2(%rip), %xmm1
+    call logaritmo
+    jmp .fim_avaliar
 
-.chamar_inverso:
-    movsd  operando1(%rip), %xmm1
-    call   verifica_zero
-    cmp    $0, %rax
-    je     .sair_avaliar
-    movsd  operando1(%rip), %xmm0
-    call   inverso
-    jmp    .fim_avaliar
+    .chamar_inverso:
+    movsd operando1(%rip), %xmm1
+    call verifica_zero
+    cmp $0, %rax
+    je .fim_avaliar
+    movsd operando1(%rip), %xmm0
+    call inverso
+    jmp .fim_avaliar
 
     # resultado já em operando1, carrega em xmm0 e retorna
-.retorna_operando1:
-    movsd  operando1(%rip), %xmm0
-    jmp    .fim_avaliar
+    .retorna_operando1:
+    movsd operando1(%rip), %xmm0
+    jmp .fim_avaliar
 
-    # ------------------------------------------------------------------
-    # EPÍLOGOS
-    # ------------------------------------------------------------------
-.fim_avaliar:
-    add    $8, %rsp
-    pop    %r15
-    pop    %r14
-    pop    %r13
-    pop    %rbx
-    pop    %rbp
+    .fim_avaliar:
+    add $8, %rsp
+    pop %r15
+    pop %r14
+    pop %r13
+    pop %rbx
+    pop %rbp
     ret
-
-.sair_avaliar:
-    add    $8, %rsp
-    pop    %r15
-    pop    %r14
-    pop    %r13
-    pop    %rbx
-    pop    %rbp
-    ret
+    
